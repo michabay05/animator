@@ -18,7 +18,7 @@
     - [ ] (feat) Translate
     - [ ] (feat) Scale
 - [ ] (feat) Add action groups
-    - These actions will have in parallel (aka. together)
+    - These actions will happen in parallel (aka. together)
 - [ ] (feat) Add a constant delay to between elements in an action group
 - [ ] (feat) Setup a Python script to generate script for animator to use
 
@@ -35,7 +35,7 @@
         - [ ] Video output path
     - [ ] Parse 'setup'
         - [x] Text
-        - [ ] Rectangle
+        - [x] Rectangle
     - [ ] Parse 'actions'
         - [x] `v2Interp`
         - [x] `clrInterp`

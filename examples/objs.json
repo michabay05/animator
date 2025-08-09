@@ -1,0 +1,23 @@
+{
+    "setup": [
+        {
+            "kind": "text",
+            "obj_id": 0,
+            "props": {
+                "text": "Hello, world!",
+                "fontSize": 32,
+                "position": [123, 321],
+                "color": [249, 134, 102, 255]
+            }
+        },
+        {
+            "kind": "rect",
+            "obj_id": 1,
+            "props": {
+                "position": [100, 100],
+                "size": [150, 30],
+                "color": [22, 249, 33, 255]
+            }
+        }
+    ]
+}

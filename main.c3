@@ -18,13 +18,14 @@ import jimp;
 //     Color color;
 // }
 
-fn bool parse_str(Jimp *jimp, String *str) {
+fn bool parse_str(Jimp *jimp, String *str) @local
+{
     if (!jimp::string(jimp)) return false;
     *str = ((ZString)jimp.string).tcopy();
     return true;
 }
 
-fn bool parse_vec2(Jimp *jimp, Vector2 *v)
+fn bool parse_vec2(Jimp *jimp, Vector2 *v) @local
 {
     if (!jimp::array_begin(jimp)) return false;
     int i = 0;
@@ -36,7 +37,7 @@ fn bool parse_vec2(Jimp *jimp, Vector2 *v)
     return jimp::array_end(jimp);
 }
 
-fn bool parse_color(Jimp *jimp, Color *c)
+fn bool parse_color(Jimp *jimp, Color *c) @local
 {
     if (!jimp::array_begin(jimp)) return false;
     int i = 0;
@@ -48,7 +49,52 @@ fn bool parse_color(Jimp *jimp, Color *c)
     return jimp::array_end(jimp);
 }
 
-fn bool parse_setup_item(Jimp *jimp, Obj *obj)
+fn bool parse_text(Jimp *jimp, Text *t) @local
+{
+    ZString member;
+    while (jimp::object_member(jimp)) {
+        member = (ZString)jimp.string;
+        if (member == "text") {
+            if (!parse_str(jimp, &t.text)) return false;
+        } else if (member == "fontSize") {
+            if (!jimp::number(jimp)) return false;
+            t.font_size = (float)jimp.number;
+        } else if (member == "position") {
+            if (!parse_vec2(jimp, &t.position)) return false;
+        } else if (member == "color") {
+            if (!parse_color(jimp, &t.color)) return false;
+        } else {
+            jimp::unknown_member(jimp);
+            io::printfn("ERROR: Unknown member: %s", (ZString)jimp.string);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+fn bool parse_rect(Jimp *jimp, Rect *r) @local
+{
+    ZString member;
+    while (jimp::object_member(jimp)) {
+        member = (ZString)jimp.string;
+        if (member == "position") {
+            if (!parse_vec2(jimp, &r.position)) return false;
+        } else if (member == "size") {
+            if (!parse_vec2(jimp, &r.size)) return false;
+        } else if (member == "color") {
+            if (!parse_color(jimp, &r.color)) return false;
+        } else {
+            jimp::unknown_member(jimp);
+            io::printfn("ERROR: Unknown member: %s", (ZString)jimp.string);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+fn bool parse_setup_item(Jimp *jimp, Obj *obj) @local
 {
     if (!jimp::object_begin(jimp)) return false;
 
@@ -61,6 +107,8 @@ fn bool parse_setup_item(Jimp *jimp, Obj *obj)
             switch (kind) {
                 case "text":
                     obj.kind = ObjKind.TEXT;
+                case "rect":
+                    obj.kind = ObjKind.RECT;
                 default:
                     io::printfn("ERROR: Unknown kind in setup: %s", kind);
                     return false;
@@ -71,23 +119,11 @@ fn bool parse_setup_item(Jimp *jimp, Obj *obj)
         } else if (member == "props") {
             if (!jimp::object_begin(jimp)) return false;
 
-            Text *t = &obj.as.text;
-            while (jimp::object_member(jimp)) {
-                member = (ZString)jimp.string;
-                if (member == "text") {
-                    if (!parse_str(jimp, &t.text)) return false;
-                } else if (member == "fontSize") {
-                    if (!jimp::number(jimp)) return false;
-                    t.font_size = (float)jimp.number;
-                } else if (member == "position") {
-                    if (!parse_vec2(jimp, &t.position)) return false;
-                } else if (member == "color") {
-                    if (!parse_color(jimp, &t.color)) return false;
-                } else {
-                    jimp::unknown_member(jimp);
-                    io::printfn("ERROR: Unknown member: %s", (ZString)jimp.string);
-                    return false;
-                }
+            switch (obj.kind) {
+                case ObjKind.TEXT:
+                    if (!parse_text(jimp, &obj.as.text)) return false;
+                case ObjKind.RECT:
+                    if (!parse_rect(jimp, &obj.as.rect)) return false;
             }
 
             if (!jimp::object_end(jimp)) return false;
@@ -101,7 +137,7 @@ fn bool parse_setup_item(Jimp *jimp, Obj *obj)
     return jimp::object_end(jimp);
 }
 
-fn bool parse_v2_interp(Jimp *jimp, Vector2Interp *vi)
+fn bool parse_v2_interp(Jimp *jimp, Vector2Interp *vi) @local
 {
     ZString member;
     while (jimp::object_member(jimp)) {
@@ -125,7 +161,7 @@ fn bool parse_v2_interp(Jimp *jimp, Vector2Interp *vi)
     return true;
 }
 
-fn bool parse_clr_interp(Jimp *jimp, ColorInterp *ci)
+fn bool parse_clr_interp(Jimp *jimp, ColorInterp *ci) @local
 {
     ZString member;
     while (jimp::object_member(jimp)) {
@@ -149,7 +185,7 @@ fn bool parse_clr_interp(Jimp *jimp, ColorInterp *ci)
     return true;
 }
 
-fn bool parse_action_item(Jimp *jimp, Action *action)
+fn bool parse_action_item(Jimp *jimp, Action *action) @local
 {
     if (!jimp::object_begin(jimp)) return false;
 
@@ -180,9 +216,9 @@ fn bool parse_action_item(Jimp *jimp, Action *action)
             // TODO: hard coding this type here is wrong
             switch (action.kind) {
                 case ActionKind.VECTOR2_INTERP:
-                    parse_v2_interp(jimp, &action.as.v2_interp);
+                    if (!parse_v2_interp(jimp, &action.as.v2_interp)) return false;
                 case ActionKind.COLOR_INTERP:
-                    parse_clr_interp(jimp, &action.as.clr_interp);
+                    if (!parse_clr_interp(jimp, &action.as.clr_interp)) return false;
             }
 
             if (!jimp::object_end(jimp)) return false;
@@ -196,7 +232,7 @@ fn bool parse_action_item(Jimp *jimp, Action *action)
     return jimp::object_end(jimp);
 }
 
-fn bool parse_script(Jimp *jimp, List{Obj} *objs, List{Action} *actions)
+fn bool parse_script(Jimp *jimp, List{Obj} *objs, List{Action} *actions) @local
 {
     if (!jimp::object_begin(jimp)) return false;
 
@@ -231,18 +267,18 @@ fn bool parse_script(Jimp *jimp, List{Obj} *objs, List{Action} *actions)
     return true;
 }
 
-fn bool? resolve_action_value_ptrs(List{Action} *actions, List{Obj} *objs)
+fn bool? resolve_action_value_ptrs(Action[] actions, Obj[] objs) @local
 {
     foreach (&action : actions) {
         switch (action.kind) {
             case ActionKind.VECTOR2_INTERP:
                 Vector2Interp* vi = &action.as.v2_interp;
-                Obj *obj = &(*objs)[vi.obj_id];
+                Obj *obj = &objs[vi.obj_id];
                 any? value_ptr = obj.get_prop_by_name(vi.prop_name)!;
                 vi.value = anycast(value_ptr, rl::Vector2)!;
             case ActionKind.COLOR_INTERP:
                 ColorInterp* ci = &action.as.clr_interp;
-                Obj *obj = &(*objs)[ci.obj_id];
+                Obj *obj = &objs[ci.obj_id];
                 any? value_ptr = obj.get_prop_by_name(ci.prop_name)!;
                 ci.value = anycast(value_ptr, rl::Color)!;
         }
@@ -279,6 +315,8 @@ fn void main(String[] args)
         switch (obj.kind) {
             case ObjKind.TEXT:
                 io::printn(obj.as.text);
+            case ObjKind.RECT:
+                io::printn(obj.as.rect);
         }
     }
 
@@ -291,7 +329,7 @@ fn void main(String[] args)
         }
     }
 
-    if (catch excuse = resolve_action_value_ptrs(&actions, &objs)) {
+    if (catch excuse = resolve_action_value_ptrs(actions.array_view(), objs.array_view())) {
         io::printn(excuse);
         return;
     }

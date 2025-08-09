@@ -12,14 +12,23 @@ struct Text
     Color color;
 }
 
+struct Rect
+{
+    Vector2 position;
+    Vector2 size;
+    Color color;
+}
+
 enum ObjKind
 {
-    TEXT
+    TEXT,
+    RECT
 }
 
 union ObjUnion
 {
     Text text;
+    Rect rect;
 }
 
 struct Obj
@@ -99,12 +108,23 @@ fn any? Text.get_prop_by_name(Text *self, String prop_name)
     }
 }
 
+fn any? Rect.get_prop_by_name(Rect *self, String prop_name)
+{
+    switch (prop_name) {
+        default:
+            return UNKNOWN_PROPERTY_NAME?;
+    }
+}
+
 fn void Obj.rl_render(Obj *self)
 {
     switch (self.kind) {
         case ObjKind.TEXT:
             Text *t = &self.as.text;
             rl::draw_text(t.text, (int)t.position.x, (int)t.position.y, (int)t.font_size, t.color);
+        case ObjKind.RECT:
+            Rect *r = &self.as.rect;
+            rl::draw_rectangle_v(r.position, r.size, r.color);
     }
 }
 
@@ -113,6 +133,8 @@ fn any? Obj.get_prop_by_name(Obj *self, String prop_name)
     switch (self.kind) {
         case ObjKind.TEXT:
             return self.as.text.get_prop_by_name(prop_name)!;
+        case ObjKind.RECT:
+            return self.as.rect.get_prop_by_name(prop_name)!;
     }
 }
 

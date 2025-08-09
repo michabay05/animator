@@ -3,7 +3,7 @@
 - [x] (refactor) Improve the system to add interpolation (or animations) to attributes
 - [ ] (feat) Add the following interpolating functions:
     - [x] Linear
-    - [x] Sinusoidal ($\sin(x)$)
+    - [x] Sinusoidal
     - [ ] Cubic bezier
 - [ ] (feat) For each render, define a render rectangle for each animation to render within
 - [ ] (feat) Create build system around [tsoding/nob.h](https://github.com/tsoding/nob.h)

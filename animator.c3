@@ -1,22 +1,41 @@
+import std::math;
 import rl;
 
-struct Circle
+enum ObjKind
 {
+    TEXT
+}
+
+union ObjUnion
+{
+    Text text;
+}
+
+struct Obj
+{
+    int id;
+    ObjKind kind;
+    ObjUnion as;
+}
+
+struct Text
+{
+    String text;
+    float font_size;
     Vector2 position;
-    float radius;
     Color color;
 }
 
-struct Rectangle
+/*
+enum InterpFunc
 {
-    Vector2 position;
-    Vector2 size;
-    Color color;
+    LINEAR,
+    SINE,
 }
 
 interface Interpolable
 {
-    fn void step(float dt);
+    fn void step(float dt, InterpFunc func_type);
 }
 
 struct FltInterp (Interpolable)
@@ -28,17 +47,7 @@ struct FltInterp (Interpolable)
     float duration;
 }
 
-fn void FltInterp.step(FltInterp *self, float dt) @dynamic
-{
-    if (self.t > self.duration) {
-        *self.value = self.end;
-    } else {
-        *self.value = self.start + ((self.t / self.duration) * (self.end - self.start));
-        self.t += dt;
-    }
-}
-
-struct V2Interp (Interpolable)
+struct Vec2Interp (Interpolable)
 {
     Vector2 start;
     Vector2 *value;
@@ -47,13 +56,38 @@ struct V2Interp (Interpolable)
     float duration;
 }
 
-fn void V2Interp.step(V2Interp *self, float dt) @dynamic
+
+fn float rate_func(float t, float duration, InterpFunc func_type)
+{
+    const float PI = 3.141592653589;
+    switch (func_type) {
+        case InterpFunc.LINEAR:
+            return t / duration;
+        case InterpFunc.SINE:
+            return -0.5 * math::cos((PI / duration) * t) + 0.5;
+    }
+}
+
+fn void FltInterp.step(FltInterp *self, float dt, InterpFunc func_type) @dynamic
 {
     if (self.t > self.duration) {
         *self.value = self.end;
     } else {
-        *self.value = self.start + ((self.t / self.duration) * (self.end - self.start));
+        float v = rate_func(self.t, self.duration, func_type);
+        *self.value = self.start + v * (self.end - self.start);
         self.t += dt;
     }
 }
+
+fn void Vec2Interp.step(Vec2Interp *self, float dt, InterpFunc func_type) @dynamic
+{
+    if (self.t > self.duration) {
+        *self.value = self.end;
+    } else {
+        float v = rate_func(self.t, self.duration, func_type);
+        *self.value = self.start + v * (self.end - self.start);
+        self.t += dt;
+    }
+}
+*/
 

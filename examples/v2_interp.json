@@ -1,0 +1,27 @@
+{
+    "setup": [
+        {
+            "kind": "text",
+            "obj_id": 0,
+            "props": {
+                "text": "Hello, world!",
+                "fontSize": 32,
+                "position": [123, 321],
+                "color": [249, 134, 102, 255]
+            }
+        }
+    ],
+    "actions": [
+        {
+            "type": "v2Interp",
+            "action_id": 0,
+            "duration": 1,
+            "props": {
+                "start": [123, 321],
+                "end": [321, 123],
+                "obj_id": 0,
+                "prop_name": "position"
+            }
+        }
+    ]
+}

@@ -116,9 +116,9 @@ extern fn void clear_background(Color color) @extern("ClearBackground");
 extern fn void draw_circle_v(Vector2 position, float radius, Color color) @extern("DrawCircleV");
 extern fn void draw_rectangle_v(Vector2 position, Vector2 size, Color color) @extern("DrawRectangleV");
 extern fn void draw_fps(CInt posX, CInt posY) @extern("DrawFPS");
-extern fn void draw_text(char *text, CInt posX, CInt posY, CInt fontSize, Color color) @extern("DrawText");
 extern fn void begin_texture_mode(RenderTexture2D target) @extern("BeginTextureMode");
 extern fn void end_texture_mode() @extern("EndTextureMode");
+extern fn void draw_text(char *text, CInt posX, CInt posY, CInt fontSize, Color color) @extern("DrawText");
 extern fn void draw_text_ex(
     Font font, char *text, Vector2 position, float fontSize,
     float spacing, Color tint

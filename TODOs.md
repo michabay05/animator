@@ -1,0 +1,46 @@
+# TODOs
+
+- [x] (refactor) Improve the system to add interpolation (or animations) to attributes
+- [ ] (feat) Add the following interpolating functions:
+    - [x] Linear
+    - [x] Sinusoidal ($\sin(x)$)
+    - [ ] Cubic bezier
+- [ ] (feat) For each render, define a render rectangle for each animation to render within
+- [ ] (feat) Create build system around [tsoding/nob.h](https://github.com/tsoding/nob.h)
+- [ ] (feat) Add live script reloading feature
+- [ ] (feat) Add the following cmd args:
+    - [ ] (feat) render
+    - [ ] (feat) preview
+    - [ ] (feat) validate (huge maybe)
+- [ ] (feat) Add the following action presets:
+    - [ ] (feat) Fade in
+    - [ ] (feat) Fade out
+    - [ ] (feat) Translate
+    - [ ] (feat) Scale
+- [ ] (feat) Add action groups
+    - These actions will have in parallel (aka. together)
+- [ ] (feat) Add a constant delay to between elements in an action group
+- [ ] (feat) Setup a Python script to generate script for animator to use
+
+## v0.1
+- [x] (rsch) Decide whether the script would be in JSON or another custom format:
+    - [ ] Custom format
+    - [x] JSON
+- [ ] (feat) Work on script generation system
+    - [ ] Parse 'config'
+        - [ ] Video resolution
+            - [ ] Width
+            - [ ] Height
+        - [ ] Video FPS
+        - [ ] Video output path
+    - [ ] Parse 'setup'
+        - [x] Text
+        - [ ] Rectangle
+    - [ ] Parse 'actions'
+        - [x] `v2Interp`
+        - [x] `clrInterp`
+        - [ ] `wait`
+- [ ] (feat) Create a python script to generate json script
+- [ ] Add action interp func customization
+- [ ] Add text font customization
+    - Animator should try to find the specified font

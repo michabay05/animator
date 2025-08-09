@@ -1,0 +1,11 @@
+Config section
+    - Video resolution (object)
+        - Width (int)
+        - Height (int)
+    - Video FPS (int)
+    - Video output path (string)
+Setup
+    - Array of objects
+
+Actions
+    - Array of actions

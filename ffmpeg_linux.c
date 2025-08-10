@@ -25,19 +25,19 @@ FFMPEG *ffmpeg_start_rendering_video(const char *output_path, size_t width, size
     int pipefd[2];
 
     if (pipe(pipefd) < 0) {
-        fprintf(stderr, "ERROR: FFMPEG: Could not create a pipe: %s", strerror(errno));
+        fprintf(stderr, "ERROR: FFMPEG: Could not create a pipe: %s\n", strerror(errno));
         return NULL;
     }
 
     pid_t child = fork();
     if (child < 0) {
-        fprintf(stderr, "ERROR: FFMPEG: could not fork a child: %s", strerror(errno));
+        fprintf(stderr, "ERROR: FFMPEG: could not fork a child: %s\n", strerror(errno));
         return NULL;
     }
 
     if (child == 0) {
         if (dup2(pipefd[READ_END], STDIN_FILENO) < 0) {
-            fprintf(stderr, "ERROR: FFMPEG CHILD: could not reopen read end of pipe as stdin: %s", strerror(errno));
+            fprintf(stderr, "ERROR: FFMPEG CHILD: could not reopen read end of pipe as stdin: %s\n", strerror(errno));
             exit(1);
         }
         close(pipefd[WRITE_END]);
@@ -72,7 +72,7 @@ FFMPEG *ffmpeg_start_rendering_video(const char *output_path, size_t width, size
             NULL
         );
         if (ret < 0) {
-            fprintf(stderr, "ERROR: FFMPEG CHILD: could not run ffmpeg as a child process: %s", strerror(errno));
+            fprintf(stderr, "ERROR: FFMPEG CHILD: could not run ffmpeg as a child process: %s\n", strerror(errno));
             exit(1);
         }
         assert(0 && "unreachable");
@@ -80,7 +80,7 @@ FFMPEG *ffmpeg_start_rendering_video(const char *output_path, size_t width, size
     }
 
     if (close(pipefd[READ_END]) < 0) {
-        fprintf(stderr, "WARN: FFMPEG: could not close read end of the pipe on the parent's end: %s", strerror(errno));
+        fprintf(stderr, "WARN: FFMPEG: could not close read end of the pipe on the parent's end: %s\n", strerror(errno));
     }
 
     FFMPEG *ffmpeg = malloc(sizeof(FFMPEG));
@@ -95,19 +95,19 @@ FFMPEG *ffmpeg_start_rendering_audio(const char *output_path)
     int pipefd[2];
 
     if (pipe(pipefd) < 0) {
-        fprintf(stderr, "ERROR: FFMPEG: Could not create a pipe: %s", strerror(errno));
+        fprintf(stderr, "ERROR: FFMPEG: Could not create a pipe: %s\n", strerror(errno));
         return NULL;
     }
 
     pid_t child = fork();
     if (child < 0) {
-        fprintf(stderr, "ERROR: FFMPEG: could not fork a child: %s", strerror(errno));
+        fprintf(stderr, "ERROR: FFMPEG: could not fork a child: %s\n", strerror(errno));
         return NULL;
     }
 
     if (child == 0) {
         if (dup2(pipefd[READ_END], STDIN_FILENO) < 0) {
-            fprintf(stderr, "ERROR: FFMPEG CHILD: could not reopen read end of pipe as stdin: %s", strerror(errno));
+            fprintf(stderr, "ERROR: FFMPEG CHILD: could not reopen read end of pipe as stdin: %s\n", strerror(errno));
             exit(1);
         }
         close(pipefd[WRITE_END]);
@@ -129,7 +129,7 @@ FFMPEG *ffmpeg_start_rendering_audio(const char *output_path)
             NULL
         );
         if (ret < 0) {
-            fprintf(stderr, "ERROR: FFMPEG CHILD: could not run ffmpeg as a child process: %s", strerror(errno));
+            fprintf(stderr, "ERROR: FFMPEG CHILD: could not run ffmpeg as a child process: %s\n", strerror(errno));
             exit(1);
         }
         assert(0 && "unreachable");
@@ -137,7 +137,7 @@ FFMPEG *ffmpeg_start_rendering_audio(const char *output_path)
     }
 
     if (close(pipefd[READ_END]) < 0) {
-        fprintf(stderr, "WARN: FFMPEG: could not close read end of the pipe on the parent's end: %s", strerror(errno));
+        fprintf(stderr, "WARN: FFMPEG: could not close read end of the pipe on the parent's end: %s\n", strerror(errno));
     }
 
     FFMPEG *ffmpeg = malloc(sizeof(FFMPEG));
@@ -155,7 +155,7 @@ bool ffmpeg_end_rendering(FFMPEG *ffmpeg, bool cancel)
     free(ffmpeg);
 
     if (close(pipe) < 0) {
-        fprintf(stderr, "WARN: FFMPEG: could not close write end of the pipe on the parent's end: %s", strerror(errno));
+        fprintf(stderr, "WARN: FFMPEG: could not close write end of the pipe on the parent's end: %s\n", strerror(errno));
     }
 
     if (cancel) kill(pid, SIGKILL);
@@ -163,14 +163,14 @@ bool ffmpeg_end_rendering(FFMPEG *ffmpeg, bool cancel)
     for (;;) {
         int wstatus = 0;
         if (waitpid(pid, &wstatus, 0) < 0) {
-            fprintf(stderr, "ERROR: FFMPEG: could not wait for ffmpeg child process to finish: %s", strerror(errno));
+            fprintf(stderr, "ERROR: FFMPEG: could not wait for ffmpeg child process to finish: %s\n", strerror(errno));
             return false;
         }
 
         if (WIFEXITED(wstatus)) {
             int exit_status = WEXITSTATUS(wstatus);
             if (exit_status != 0) {
-                fprintf(stderr, "ERROR: FFMPEG: ffmpeg exited with code %d", exit_status);
+                fprintf(stderr, "ERROR: FFMPEG: ffmpeg exited with code %d\n", exit_status);
                 return false;
             }
 
@@ -178,7 +178,7 @@ bool ffmpeg_end_rendering(FFMPEG *ffmpeg, bool cancel)
         }
 
         if (WIFSIGNALED(wstatus)) {
-            fprintf(stderr, "ERROR: FFMPEG: ffmpeg got terminated by %s", strsignal(WTERMSIG(wstatus)));
+            fprintf(stderr, "ERROR: FFMPEG: ffmpeg got terminated by %s\n", strsignal(WTERMSIG(wstatus)));
             return false;
         }
     }
@@ -191,7 +191,7 @@ bool ffmpeg_send_frame_flipped(FFMPEG *ffmpeg, void *data, size_t width, size_t 
     for (size_t y = height; y > 0; --y) {
         // TODO: write() may not necessarily write the entire row. We may want to repeat the call.
         if (write(ffmpeg->pipe, (uint32_t*)data + (y - 1)*width, sizeof(uint32_t)*width) < 0) {
-            fprintf(stderr, "ERROR: FFMPEG: failed to write frame into ffmpeg pipe: %s", strerror(errno));
+            fprintf(stderr, "ERROR: FFMPEG: failed to write frame into ffmpeg pipe: %s\n", strerror(errno));
             return false;
         }
     }
@@ -201,7 +201,7 @@ bool ffmpeg_send_frame_flipped(FFMPEG *ffmpeg, void *data, size_t width, size_t 
 bool ffmpeg_send_sound_samples(FFMPEG *ffmpeg, void *data, size_t size)
 {
     if (write(ffmpeg->pipe, data, size) < 0) {
-        fprintf(stderr, "ERROR: FFMPEG: failed to write sound into ffmpeg pipe: %s", strerror(errno));
+        fprintf(stderr, "ERROR: FFMPEG: failed to write sound into ffmpeg pipe: %s\n", strerror(errno));
         return false;
     }
     return true;

@@ -7,13 +7,13 @@ faultdef UNKNOWN_PROPERTY_NAME;
 struct Config
 {
     Vector2 resolution;
-    String output_path;
+    ZString output_path;
     int fps;
 }
 
 struct Text
 {
-    String text;
+    ZString text;
     float font_size;
     Vector2 position;
     Color color;
@@ -68,7 +68,7 @@ struct Vector2Interp
     // NOTE: the properties below are only needed on parsing json script
     // to resolve the value ptr
     int obj_id;
-    String prop_name;
+    ZString prop_name;
 }
 
 struct ColorInterp
@@ -79,7 +79,7 @@ struct ColorInterp
     // NOTE: the properties below are only needed on parsing json script
     // to resolve the value ptr
     int obj_id;
-    String prop_name;
+    ZString prop_name;
 }
 
 enum ActionKind
@@ -123,6 +123,16 @@ fn any? Rect.get_prop_by_name(Rect *self, String prop_name)
     }
 }
 
+fn any? Obj.get_prop_by_name(Obj *self, String prop_name)
+{
+    switch (self.kind) {
+        case ObjKind.TEXT:
+            return self.as.text.get_prop_by_name(prop_name)!;
+        case ObjKind.RECT:
+            return self.as.rect.get_prop_by_name(prop_name)!;
+    }
+}
+
 fn void Obj.rl_render(Obj *self)
 {
     switch (self.kind) {
@@ -132,16 +142,6 @@ fn void Obj.rl_render(Obj *self)
         case ObjKind.RECT:
             Rect *r = &self.as.rect;
             rl::draw_rectangle_v(r.position, r.size, r.color);
-    }
-}
-
-fn any? Obj.get_prop_by_name(Obj *self, String prop_name)
-{
-    switch (self.kind) {
-        case ObjKind.TEXT:
-            return self.as.text.get_prop_by_name(prop_name)!;
-        case ObjKind.RECT:
-            return self.as.rect.get_prop_by_name(prop_name)!;
     }
 }
 

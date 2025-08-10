@@ -18,10 +18,10 @@ import jimp;
 //     Color color;
 // }
 
-fn bool parse_str(Jimp *jimp, String *str) @local
+fn bool parse_str(Jimp *jimp, ZString *str) @local
 {
     if (!jimp::string(jimp)) return false;
-    *str = ((ZString)jimp.string).tcopy();
+    *str = ((ZString)jimp.string).str_view().zstr_tcopy();
     return true;
 }
 
@@ -102,9 +102,9 @@ fn bool parse_setup_item(Jimp *jimp, Obj *obj) @local
     while (jimp::object_member(jimp)) {
         member = (ZString)jimp.string;
         if (member == "kind") {
-            String kind;
+            ZString kind;
             if (!parse_str(jimp, &kind)) return false;
-            switch (kind) {
+            switch (kind.str_view()) {
                 case "text":
                     obj.kind = ObjKind.TEXT;
                 case "rect":
@@ -193,9 +193,9 @@ fn bool parse_action_item(Jimp *jimp, Action *action) @local
     while (jimp::object_member(jimp)) {
         member = (ZString)jimp.string;
         if (member == "type") {
-            String kind;
+            ZString kind;
             if (!parse_str(jimp, &kind)) return false;
-            switch (kind) {
+            switch (kind.str_view()) {
                 case "v2Interp":
                     action.kind = ActionKind.VECTOR2_INTERP;
                 case "clrInterp":
@@ -239,12 +239,12 @@ fn bool? resolve_action_value_ptrs(Action[] actions, Obj[] objs) @local
             case ActionKind.VECTOR2_INTERP:
                 Vector2Interp* vi = &action.as.v2_interp;
                 Obj *obj = &objs[vi.obj_id];
-                any? value_ptr = obj.get_prop_by_name(vi.prop_name)!;
+                any? value_ptr = obj.get_prop_by_name(vi.prop_name.str_view())!;
                 vi.value = anycast(value_ptr, rl::Vector2)!;
             case ActionKind.COLOR_INTERP:
                 ColorInterp* ci = &action.as.clr_interp;
                 Obj *obj = &objs[ci.obj_id];
-                any? value_ptr = obj.get_prop_by_name(ci.prop_name)!;
+                any? value_ptr = obj.get_prop_by_name(ci.prop_name.str_view())!;
                 ci.value = anycast(value_ptr, rl::Color)!;
         }
     }
@@ -314,7 +314,6 @@ fn bool parse_script(Jimp *jimp, Config *cfg, List{Obj} *objs, List{Action} *act
     return true;
 }
 
-
 fn void main(String[] args)
 {
     if (args.len == 1) {
@@ -333,9 +332,16 @@ fn void main(String[] args)
     Jimp jimp;
     jimp::begin(&jimp, script_path, content, content.len());
 
-    Config cfg;
+    // State
+    Config cfg = {
+        .resolution = {800, 600},
+        .output_path = "out.mov",
+        .fps = 30,
+    };
     List{Obj} objs;
     List{Action} actions;
+    bool rendering = false;
+    bool paused = true;
 
     bool result = parse_script(&jimp, &cfg, &objs, &actions);
     if (!result) {
@@ -374,15 +380,63 @@ fn void main(String[] args)
     rl::set_target_fps(cfg.fps);
     defer rl::close_window();
 
+    float duration = 0.0;
+    float max_duration = 2.0;
+    RenderTexture2D rtex = rl::load_render_texture((int)cfg.resolution.x, (int)cfg.resolution.y);
+    defer rl::unload_render_texture(rtex);
+
+    Ffmpeg *ffmpeg = null;
     while (!rl::window_should_close()) {
-        foreach (&action : actions) {
-            action.step(rl::get_frame_time());
+        if (rl::is_key_pressed(KeyboardKey.SPACE.code)) {
+            paused = !paused;
+        }
+        if (rl::is_key_pressed(KeyboardKey.R.code)) {
+            duration = 0.0;
+            rendering = true;
+            paused = false;
+            rl::set_trace_log_level(TraceLogLevel.WARNING);
+            ffmpeg = ffmpeg::start_rendering_video(
+                cfg.output_path, (usz)cfg.resolution.x, (usz)cfg.resolution.y, (usz)cfg.fps
+            );
+        }
+
+        float dt = rl::get_frame_time();
+        if (!paused) {
+            foreach (&action : actions) {
+                action.step(dt);
+            }
         }
 
         rl::begin_drawing();
-            rl::clear_background(rl::get_color(0x181818FF));
-            foreach (&obj : objs) {
-                obj.rl_render();
+            if (ffmpeg) {
+                rl::begin_texture_mode(rtex);
+                    rl::clear_background(rl::get_color(0x181818FF));
+                    foreach (&obj : objs) {
+                        obj.rl_render();
+                    }
+                rl::end_texture_mode();
+
+                Image img = rl::load_image_from_texture(rtex.texture);
+                defer rl::unload_image(img);
+                if (!ffmpeg::send_frame_flipped(ffmpeg, img.data, img.width, img.height)) {
+                    ffmpeg::end_rendering(ffmpeg, true);
+                    io::printn("ERROR: Failed to send frame to ffmpeg");
+                }
+
+                if (duration >= max_duration) {
+                    // TODO: handle boolean value here
+                    ffmpeg::end_rendering(ffmpeg, false);
+                    rl::set_trace_log_level(TraceLogLevel.INFO);
+                    ffmpeg = null;
+                    break;
+                } else {
+                    duration += dt;
+                }
+            } else {
+                rl::clear_background(rl::get_color(0x181818FF));
+                foreach (&obj : objs) {
+                    obj.rl_render();
+                }
             }
         rl::end_drawing();
     }

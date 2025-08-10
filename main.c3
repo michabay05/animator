@@ -232,41 +232,6 @@ fn bool parse_action_item(Jimp *jimp, Action *action) @local
     return jimp::object_end(jimp);
 }
 
-fn bool parse_script(Jimp *jimp, List{Obj} *objs, List{Action} *actions) @local
-{
-    if (!jimp::object_begin(jimp)) return false;
-
-    ZString member;
-    int i = 0;
-    while (jimp::object_member(jimp)) {
-        member = (ZString)jimp.string;
-        if (member == "setup") {
-            if (!jimp::array_begin(jimp)) return false;
-            Obj obj;
-            while (jimp::array_item(jimp)) {
-                if (!parse_setup_item(jimp, &obj)) return false;
-                objs.push(obj);
-            }
-            if (!jimp::array_end(jimp)) return false;
-        } else if (member == "actions") {
-            if (!jimp::array_begin(jimp)) return false;
-            Action action;
-            while (jimp::array_item(jimp)) {
-                if (!parse_action_item(jimp, &action)) return false;
-                actions.push(action);
-            }
-            if (!jimp::array_end(jimp)) return false;
-        } else {
-            jimp::unknown_member(jimp);
-            io::printfn("ERROR: Unknown member: %s", (ZString)jimp.string);
-            return false;
-        }
-    }
-
-    if (!jimp::object_end(jimp)) return false;
-    return true;
-}
-
 fn bool? resolve_action_value_ptrs(Action[] actions, Obj[] objs) @local
 {
     foreach (&action : actions) {
@@ -288,6 +253,68 @@ fn bool? resolve_action_value_ptrs(Action[] actions, Obj[] objs) @local
     return true;
 }
 
+fn bool parse_config(Jimp *jimp, Config *cfg) @local
+{
+    if (!jimp::object_begin(jimp)) return false;
+
+    ZString member;
+    while (jimp::object_member(jimp)) {
+        member = (ZString)jimp.string;
+        if (member == "resolution") {
+            if (!parse_vec2(jimp, &cfg.resolution)) return false;
+        } else if (member == "outputPath") {
+            if (!parse_str(jimp, &cfg.output_path)) return false;
+        } else if (member == "fps") {
+            if (!jimp::number(jimp)) return false;
+            cfg.fps = (int)jimp.number;
+        } else {
+            jimp::unknown_member(jimp);
+            io::printfn("ERROR: Unknown member: %s", (ZString)jimp.string);
+            return false;
+        }
+    }
+
+    return jimp::object_end(jimp);
+}
+
+fn bool parse_script(Jimp *jimp, Config *cfg, List{Obj} *objs, List{Action} *actions) @local
+{
+    if (!jimp::object_begin(jimp)) return false;
+
+    ZString member;
+    while (jimp::object_member(jimp)) {
+        member = (ZString)jimp.string;
+        io::printn(member);
+        if (member == "config") {
+            if (!parse_config(jimp, cfg)) return false;
+        } else if (member == "setup") {
+            if (!jimp::array_begin(jimp)) return false;
+            Obj obj;
+            while (jimp::array_item(jimp)) {
+                if (!parse_setup_item(jimp, &obj)) return false;
+                objs.push(obj);
+            }
+            if (!jimp::array_end(jimp)) return false;
+        } else if (member == "actions") {
+            if (!jimp::array_begin(jimp)) return false;
+            Action action;
+            while (jimp::array_item(jimp)) {
+                if (!parse_action_item(jimp, &action)) return false;
+                actions.push(action);
+            }
+            if (!jimp::array_end(jimp)) return false;
+        } else {
+            jimp::unknown_member(jimp);
+            io::printfn("ERROR: Unknown member: %s", member);
+            return false;
+        }
+    }
+
+    if (!jimp::object_end(jimp)) return false;
+    return true;
+}
+
+
 fn void main(String[] args)
 {
     if (args.len == 1) {
@@ -306,11 +333,19 @@ fn void main(String[] args)
     Jimp jimp;
     jimp::begin(&jimp, script_path, content, content.len());
 
+    Config cfg;
     List{Obj} objs;
     List{Action} actions;
 
-    bool result = parse_script(&jimp, &objs, &actions);
-    if (!result) return;
+    bool result = parse_script(&jimp, &cfg, &objs, &actions);
+    if (!result) {
+        io::printn("Failed to parse script");
+        return;
+    }
+
+    io::print("Config: ");
+    io::printn(cfg);
+
     foreach (obj : objs) {
         switch (obj.kind) {
             case ObjKind.TEXT:
@@ -335,8 +370,8 @@ fn void main(String[] args)
     }
 
     rl::set_config_flags(ConfigFlags.FLAG_MSAA_4X_HINT.code);
-    rl::init_window(800, 600, "Hello, from c3");
-    rl::set_target_fps(60);
+    rl::init_window((int)cfg.resolution.x, (int)cfg.resolution.y, "Hello, from c3");
+    rl::set_target_fps(cfg.fps);
     defer rl::close_window();
 
     while (!rl::window_should_close()) {

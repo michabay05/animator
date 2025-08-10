@@ -4,6 +4,13 @@ import rl;
 
 faultdef UNKNOWN_PROPERTY_NAME;
 
+struct Config
+{
+    Vector2 resolution;
+    String output_path;
+    int fps;
+}
+
 struct Text
 {
     String text;

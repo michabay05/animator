@@ -21,19 +21,20 @@
     - These actions will happen in parallel (aka. together)
 - [ ] (feat) Add a constant delay to between elements in an action group
 - [ ] (feat) Setup a Python script to generate script for animator to use
+- [ ] (feat) Add time multiplier to slow or speed up animation
 
 ## v0.1
 - [x] (rsch) Decide whether the script would be in JSON or another custom format:
     - [ ] Custom format
     - [x] JSON
 - [ ] (feat) Work on script generation system
-    - [ ] Parse 'config'
-        - [ ] Video resolution
-            - [ ] Width
-            - [ ] Height
-        - [ ] Video FPS
-        - [ ] Video output path
-    - [ ] Parse 'setup'
+    - [x] Parse 'config'
+        - [x] Video resolution
+            - [x] Width
+            - [x] Height
+        - [x] Video FPS
+        - [x] Video output path
+    - [x] Parse 'setup'
         - [x] Text
         - [x] Rectangle
     - [ ] Parse 'actions'

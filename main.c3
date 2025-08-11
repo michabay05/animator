@@ -27,6 +27,10 @@ fn void main(String[] args)
         if (rl::is_key_pressed(KeyboardKey.SPACE.code)) {
             v.paused = !v.paused;
         }
+        if (rl::is_key_pressed(KeyboardKey.S.code)) {
+            v.reload_script()!!;
+            io::printfn("Reloaded script: '%s'", v.script_path);
+        }
         if (rl::is_key_pressed(KeyboardKey.R.code) && v.can_render()) {
             v.duration = 0.0;
             v.rendering = true;

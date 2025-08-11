@@ -185,6 +185,7 @@ fn float rate_func(float t, float duration, InterpFunc func_type)
 struct Video
 {
     // Parsing
+    String script_path;
     Config cfg;
     List{Obj} objs;
     List{Action} actions;
@@ -617,6 +618,7 @@ fn void? parse_script(Jimp *jimp, Video *v) @local
 
 fn void? Video.init(Video *self, String script_path)
 {
+    self.script_path = script_path;
     // TODO: replace this to make the buffer depend on the size of the file
     File f = file::open(script_path, "r")!;
     defer (void)f.close();
@@ -639,6 +641,7 @@ fn void? Video.init(Video *self, String script_path)
     parse_script(&jimp, self)!;
 
     self.rendering = false;
+    self.complete = false;
     self.paused = true;
     self.ffmpeg = null;
     self.duration = 0.0;
@@ -656,6 +659,11 @@ fn void Video.deinit(Video *self)
     self.actions.free();
 }
 
+fn void? Video.reload_script(Video *self)
+{
+    self.deinit();
+    self.init(self.script_path)!;
+}
 
 fn void Video.step(Video *self, float dt)
 {

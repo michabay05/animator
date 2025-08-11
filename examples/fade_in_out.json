@@ -22,6 +22,28 @@
                 "obj_id": 0,
                 "prop_name": "color"
             }
+        },
+        {
+            "kind": "v2Interp",
+            "action_id": 2,
+            "duration": 1.5,
+            "props": {
+                "start": [123, 321],
+                "end": [321, 123],
+                "obj_id": 0,
+                "prop_name": "position"
+            }
+        },
+        {
+            "kind": "clrInterp",
+            "action_id": 3,
+            "duration": 0.75,
+            "props": {
+                "start": [249, 134, 102, 0],
+                "end": [249, 134, 102, 255],
+                "obj_id": 0,
+                "prop_name": "color"
+            }
         }
     ]
 }

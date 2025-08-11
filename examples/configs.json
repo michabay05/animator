@@ -1,6 +1,7 @@
 {
     "config": {
-        "resolution": [800, 600],
+        "width": 800,
+        "height": 600,
         "outputPath": "out.mov",
         "fps": 30
     }

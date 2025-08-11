@@ -24,6 +24,7 @@
 - [ ] (feat) Add time multiplier to slow or speed up animation
 - [ ] (feat) Add an on-screen indicator when screen is paused
 - [ ] (feat) Create a python script to generate json script
+- [ ] (feat) Add background color configuration in json script
 
 ## v0.1
 - [x] (rsch) Decide whether the script would be in JSON or another custom format:
@@ -39,11 +40,12 @@
     - [x] Parse 'setup'
         - [x] Text
         - [x] Rectangle
-    - [ ] Parse 'actions'
+    - [x] Parse 'actions'
         - [x] `v2Interp`
         - [x] `clrInterp`
-        - [ ] `wait`
+        - [x] `wait`
 - [x] Implement video rendering using ffmpeg
+    - [x] Trigger rendering on key 'r' being pressed
 - [ ] Add action interp func customization
 - [ ] Add text font customization
     - Animator should try to find the specified font

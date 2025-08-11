@@ -37,6 +37,7 @@ struct Jimp {
     bool boolean;
 }
 
+extern fn void diagf(Jimp *jimp, char *fmt, ...) @extern("jimp_diagf");
 extern fn void begin(Jimp *jimp, char *file_path, char *input, usz input_size) @extern("jimp_begin");
 extern fn bool object_begin(Jimp *jimp) @extern("jimp_object_begin");
 extern fn bool object_member(Jimp *jimp) @extern("jimp_object_member");

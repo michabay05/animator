@@ -659,7 +659,7 @@ fn void Video.deinit(Video *self)
 
 fn void Video.step(Video *self, float dt)
 {
-    if (self.complete || self.paused) return;
+    if (self.actions.len() == 0 || self.complete || self.paused) return;
 
     Action *a = &self.actions[self.act_idx];
     if (a.done()) {

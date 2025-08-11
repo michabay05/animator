@@ -6,7 +6,6 @@
     - [x] Sinusoidal
     - [ ] Cubic bezier
 - [ ] (feat) For each render, define a render rectangle for each animation to render within
-- [ ] (feat) Create build system around [tsoding/nob.h](https://github.com/tsoding/nob.h)
 - [ ] (feat) Add live script reloading feature
 - [ ] (feat) Add the following cmd args:
     - [ ] (feat) render
@@ -25,8 +24,10 @@
 - [ ] (feat) Add an on-screen indicator when screen is paused
 - [ ] (feat) Create a python script to generate json script
 - [ ] (feat) Add background color configuration in json script
+- [ ] (feat) Create build system around [tsoding/nob.h](https://github.com/tsoding/nob.h)
+    - This may not happen
 
-## v0.1
+## Completed
 - [x] (rsch) Decide whether the script would be in JSON or another custom format:
     - [ ] Custom format
     - [x] JSON

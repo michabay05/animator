@@ -1,14 +1,14 @@
 .PHONY: compile
 
-all: libjimp.a libffmpeg_linux.a main
+all: libffmpeg_linux.a libjimp.a main
 
 libffmpeg_linux.a: ffmpeg_linux.c
 	gcc -c ffmpeg_linux.c -o ffmpeg_linux.o
 	ar rcs libffmpeg_linux.a ffmpeg_linux.o
 	rm ffmpeg_linux.o
 
-libjimp.a: jimp.c jimp.h
-	gcc -c jimp.c -o jimp.o
+libjimp.a: jimp.h
+	gcc -x c jimp.h -c -DJIMP_IMPLEMENTATION
 	ar rcs libjimp.a jimp.o
 	rm jimp.o
 

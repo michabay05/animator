@@ -1,11 +1,17 @@
 {
+    "config": {
+        "width": 1440,
+        "height": 2160,
+        "outputPath": "out.mov",
+        "fps": 30
+    },
     "objs": [
         {
             "kind": "text",
             "obj_id": 0,
             "props": {
                 "text": "Hello, world!",
-                "fontSize": 32,
+                "fontSize": 80,
                 "position": [123, 321],
                 "color": [249, 134, 102, 255]
             }
@@ -13,19 +19,24 @@
     ],
     "actions": [
         {
-            "kind": "clrInterp",
+            "kind": "wait",
             "action_id": 0,
+            "duration": 2
+        },
+        {
+            "kind": "clrInterp",
+            "action_id": 1,
             "duration": 1,
             "props": {
                 "start": [249, 134, 102, 255],
-                "end": [249, 134, 102, 0],
+                "end": [249, 134, 102, 50],
                 "obj_id": 0,
                 "prop_name": "color"
             }
         },
         {
             "kind": "v2Interp",
-            "action_id": 2,
+            "action_id": 3,
             "duration": 1.5,
             "props": {
                 "start": [123, 321],
@@ -35,11 +46,16 @@
             }
         },
         {
+            "kind": "wait",
+            "action_id": 4,
+            "duration": 1
+        },
+        {
             "kind": "clrInterp",
-            "action_id": 3,
+            "action_id": 5,
             "duration": 0.75,
             "props": {
-                "start": [249, 134, 102, 0],
+                "start": [249, 134, 102, 50],
                 "end": [249, 134, 102, 255],
                 "obj_id": 0,
                 "prop_name": "color"

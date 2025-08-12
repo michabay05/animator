@@ -50,7 +50,7 @@ FFMPEG *ffmpeg_start_rendering_video(const char *output_path, size_t width, size
         int ret = execlp("ffmpeg",
             "ffmpeg",
 
-            "-loglevel", "verbose",
+            // "-loglevel", "verbose",
             "-y",
 
             "-f", "rawvideo",
@@ -59,10 +59,11 @@ FFMPEG *ffmpeg_start_rendering_video(const char *output_path, size_t width, size
             "-r", framerate,
             "-i", "-",
 
-            // "-c:v", "libx264",
-            "-c:v", "rawvideo",
+            "-c:v", "libx264",
+            // "-c:v", "rawvideo",
             "-b:v", "8500k",
-            "-pix_fmt", "rgba",
+            // "-pix_fmt", "rgba",
+            "-pix_fmt", "yuv444p",
             // ------- Audio stuff
             // "-c:a", "aac",
             // "-ab", "200k",

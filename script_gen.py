@@ -196,7 +196,7 @@ def main():
     t = Text("Hello, world!", 32, Vector2(123, 321), Color(249, 134, 102, 255))
     v.add_obj(t)
 
-    ci = ColorInterp(t.color, Color(255, 0, 0, 255), t.id, "color", 3)
+    ci = ColorInterp(t.color, Color(0, 255, 0, 255), t.id, "color", 3)
     v.add_action(ci)
 
     vi = Vector2Interp(t.position, Vector2(321, 123), t.id, "position", 1)

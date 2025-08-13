@@ -1,10 +1,5 @@
 # TODOs
 
-- [x] (refactor) Improve the system to add interpolation (or animations) to attributes
-- [ ] (feat) Add the following interpolating functions:
-    - [x] Linear
-    - [x] Sinusoidal
-    - [ ] Cubic bezier
 - [ ] (feat) For each render, define a render rectangle for each animation to render within
 - [ ] (feat) Add live script reloading feature
 - [ ] (feat) Add the following cmd args:
@@ -25,7 +20,10 @@
 - [ ] (feat) Create a python script to generate json script
 - [ ] (feat) Add background color configuration in json script
 - [ ] (feat) Create build system around [tsoding/nob.h](https://github.com/tsoding/nob.h)
-    - This may not happen
+- [ ] (feat) Show progress bar on the bottom for video
+- [ ] Add action interp func customization
+- [ ] Add text font customization
+    - Animator should try to find the specified font
 
 ## Completed
 - [x] (rsch) Decide whether the script would be in JSON or another custom format:
@@ -47,6 +45,7 @@
         - [x] `wait`
 - [x] Implement video rendering using ffmpeg
     - [x] Trigger rendering on key 'r' being pressed
-- [ ] Add action interp func customization
-- [ ] Add text font customization
-    - Animator should try to find the specified font
+- [x] (refactor) Improve the system to add interpolation (or animations) to attributes
+- [x] (feat) Add the following interpolating functions:
+    - [x] Linear
+    - [x] Sinusoidal

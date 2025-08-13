@@ -1,11 +1,9 @@
-#include "arena.h"
 #include <string.h>
+
 #define ARENA_IMPLEMENTATION
 #include "animator.h"
 #define JIMP_IMPLEMENTATION
 #include "jimp.h"
-#include "ffmpeg.h"
-#include "../raylib/include/raymath.h"
 
 
 static anim_result _anim_obj_get_prop_by_name(
@@ -65,12 +63,17 @@ void anim_obj_render(const anim_obj *obj) {
         case AOK_TEXT: {
             Font font = GetFontDefault();
             const anim_text *t = &obj->as.text;
-            DrawTextEx(font, t->text, t->position, t->font_size, 2.0, t->color);
+            // Convert to pixel value
+            float spacing = 0.0;
+            Vector2 text_dim = MeasureTextEx(font, t->text, t->font_size, spacing);
+            Vector2 center = Vector2Subtract(t->position, Vector2Scale(text_dim, 0.5f));
+            DrawTextEx(font, t->text, center, t->font_size, spacing, t->color);
             break;
         }
         case AOK_RECT: {
             const anim_rect *r = &obj->as.rect;
-            DrawRectangleV(r->position, r->size, r->color);
+            Vector2 center = Vector2Subtract(r->position, Vector2Scale(r->size, 0.5f));
+            DrawRectangleV(center, r->size, r->color);
             break;
         }
     }

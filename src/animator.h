@@ -8,6 +8,7 @@
 #include "ffmpeg.h"
 
 #include "../raylib/include/raylib.h"
+#include "../raylib/include/raymath.h"
 
 typedef enum {
     AR_NONE,

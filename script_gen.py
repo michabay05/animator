@@ -1,15 +1,23 @@
 import json, os, sys
 
+PX_TO_UNIT: float = 50.0
+
 class Vector2:
     def __init__(self, x: float, y: float) -> None:
         self.x: float = x
         self.y: float = y
 
-    def copy(self) -> 'Vector2':
-        return Vector2(self.x, self.y)
+    @classmethod
+    def zero(cls) -> 'Vector2':
+        return cls(0.0, 0.0)
+
+    @classmethod
+    def one(cls) -> 'Vector2':
+        return cls(1.0, 1.0)
 
     def as_list(self) -> list[float]:
-        return [self.x, self.y]
+        return [self.x * PX_TO_UNIT, self.y * PX_TO_UNIT]
+
 
 class Color:
     def __init__(self, r: int, g: int, b: int, a: int) -> None:
@@ -17,6 +25,10 @@ class Color:
         self.g: int = max(min(g, 255), 0)
         self.b: int = max(min(b, 255), 0)
         self.a: int = max(min(a, 255), 0)
+
+    @classmethod
+    def white(cls) -> 'Color':
+        return cls(255, 255, 255, 255)
 
     def as_list(self) -> list[int]:
         return [self.r, self.g, self.b, self.a]
@@ -40,7 +52,10 @@ class Obj:
         }
 
 class Text(Obj):
-    def __init__(self, text: str, font_size: float, position: Vector2, color: Color) -> None:
+    def __init__(self,
+        text: str, font_size: float = 28, position: Vector2 = Vector2.zero(),
+        color: Color = Color.white()
+    ) -> None:
         super().__init__("text")
         self.text: str = text
         self.font_size: float = font_size
@@ -59,7 +74,10 @@ class Text(Obj):
         }
 
 class Rect(Obj):
-    def __init__(self, position: Vector2, size: Vector2, color: Color) -> None:
+    def __init__(self,
+        position: Vector2 = Vector2.zero(), size: Vector2 = Vector2.one(),
+        color: Color = Color.white()
+    ) -> None:
         super().__init__("rect")
         self.position: Vector2 = position
         self.size: Vector2 = size
@@ -168,12 +186,12 @@ class Video:
 
     def as_dict(self) -> dict:
         return {
-            # "config": {
-            #     "width": self._width,
-            #     "height": self._height,
-            #     "outputPath": self._output_path,
-            #     "fps": 30
-            # },
+            "config": {
+                "width": self.width,
+                "height": self.height,
+                "outputPath": self.output_path,
+                "fps": self.fps
+            },
             "objs": [ obj.as_dict() for obj in self.objs ],
             "actions": [ action.as_dict() for action in self.actions ]
         }
@@ -191,15 +209,14 @@ class Video:
 
 
 def main():
-    v = Video(800, 600, "out1.mov", fps=30)
+    v = Video(1080, 1920, "out1.mov", fps=30)
 
-    t = Text("Hello, world!", 32, Vector2(123, 321), Color(249, 134, 102, 255))
+    t = Text("Hello, world!")
     v.add_obj(t)
+    # r = Rect()
+    # v.add_obj(r)
 
-    ci = ColorInterp(t.color, Color(0, 255, 0, 255), t.id, "color", 3)
-    v.add_action(ci)
-
-    vi = Vector2Interp(t.position, Vector2(321, 123), t.id, "position", 1)
+    vi = Vector2Interp(t.position, Vector2(1, 1), t.id, "position", 1)
     v.add_action(vi)
 
     v.to_json("test.json", overwrite=True)

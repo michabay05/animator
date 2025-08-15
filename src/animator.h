@@ -73,6 +73,13 @@ typedef enum {
     AAK_WAIT
 } anim_action_kind;
 
+// NOTE: this enum is only to verify the types of properties
+//       after resolving the value ptrs
+typedef enum {
+    APT_VEC2,
+    APT_COLOR,
+} anim_prop_type;
+
 typedef enum {
     IF_LINEAR,
     IF_SINE,
@@ -98,9 +105,6 @@ typedef struct {
 
 typedef struct {
     anim_action_kind kind;
-    uint16_t action_id;
-    float t;
-    float duration;
     union {
         anim_v2_interp v2_interp;
         anim_clr_interp clr_interp;
@@ -114,11 +118,24 @@ typedef struct {
 } anim_action_list;
 
 typedef struct {
+    uint16_t id;
+    float t;
+    float duration;
+    anim_action_list items;
+} anim_action_group;
+
+typedef struct {
+    anim_action_group *items;
+    size_t count;
+    size_t capacity;
+} anim_action_group_list;
+
+typedef struct {
     const char *script_path;
     Arena arena;
     anim_config cfg;
     anim_obj_list objs;
-    anim_action_list actions;
+    anim_action_group_list action_groups;
 
     bool paused;
     bool complete;

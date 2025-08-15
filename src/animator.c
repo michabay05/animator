@@ -1,5 +1,3 @@
-#include <string.h>
-
 #define ARENA_IMPLEMENTATION
 #include "animator.h"
 #define JIMP_IMPLEMENTATION
@@ -7,7 +5,7 @@
 
 
 static anim_result _anim_obj_get_prop_by_name(
-    anim_obj *obj, const char *prop_name, void **ptr
+    anim_obj *obj, const char *prop_name, void **ptr, anim_prop_type *apt
 );
 static anim_result _resolve_action_value_ptrs(anim_action_list *actions, anim_obj_list *objs);
 static anim_result _parse_script(Jimp *j, anim_ctx *ctx);
@@ -44,7 +42,11 @@ anim_result anim_ctx_init(anim_ctx *ctx, const char *script_path) {
     ctx->paused = true;
     ctx->duration = 0.0;
     ctx->act_idx = 0;
-    _resolve_action_value_ptrs(&ctx->actions, &ctx->objs);
+
+    for (size_t i = 0; i < ctx->action_groups.count; i++) {
+        anim_action_group *ag = &ctx->action_groups.items[i];
+        _resolve_action_value_ptrs(&ag->items, &ctx->objs);
+    }
 
     return res;
 }
@@ -87,22 +89,22 @@ void anim_obj_render(const anim_obj *obj) {
     }
 }
 
-static bool anim_action_done(anim_action *a);
-static void anim_action_step(anim_action *a, float dt);
+static void anim_action_group_step(anim_action_group *ag, float dt);
+static bool anim_action_group_done(anim_action_group *ag);
 void anim_ctx_step(anim_ctx *ctx, float dt) {
-    if (ctx->actions.count == 0 || ctx->complete || ctx->paused) return;
+    if (ctx->action_groups.count == 0 || ctx->complete || ctx->paused) return;
 
-    anim_action *a = &ctx->actions.items[ctx->act_idx];
-    if (anim_action_done(a)) {
+    anim_action_group *a = &ctx->action_groups.items[ctx->act_idx];
+    if (anim_action_group_done(a)) {
         ctx->act_idx++;
-        if (ctx->act_idx >= ctx->actions.count) {
+        if (ctx->act_idx >= ctx->action_groups.count) {
             ctx->complete = true;
             return;
         }
-        a = &ctx->actions.items[ctx->act_idx];
+        a = &ctx->action_groups.items[ctx->act_idx];
     }
 
-    anim_action_step(a, dt);
+    anim_action_group_step(a, dt);
 }
 
 // ======================== STATIC FUNCTIONS ========================
@@ -393,13 +395,14 @@ static anim_result _parse_clr_interp(Jimp *j, Arena *a, anim_clr_interp *ci) {
 
 static anim_result _parse_action(Jimp *j, Arena *a, anim_action *act) {
     if (!jimp_object_begin(j)) {
-        jimp_diagf(j, "Expected the start of an object, '{', for actions\n");
+        jimp_diagf(j, "Expected the start of an object, '{', for an action\n");
         return AR_FAILED_SCRIPT_PARSING;
     }
 
     const char *member = NULL;
     while (jimp_object_member(j)) {
         member = j->string;
+
         if (strncmp(member, "kind", 4) == 0) {
             if (!jimp_string(j)) {
                 jimp_diagf(j, "Expected a `string` for action.kind\n");
@@ -417,18 +420,6 @@ static anim_result _parse_action(Jimp *j, Arena *a, anim_action *act) {
                 jimp_diagf(j, "Unknown kind of action: %s\n", kind);
                 return AR_FAILED_SCRIPT_PARSING;
             }
-        } else if (strncmp(member, "action_id", 9) == 0) {
-            if (!jimp_number(j)) {
-                jimp_diagf(j, "Expected an `integer` for action.action_id\n");
-                return AR_FAILED_SCRIPT_PARSING;
-            }
-            act->action_id = (uint16_t)j->number;
-        } else if (strncmp(member, "duration", 8) == 0) {
-            if (!jimp_number(j)) {
-                jimp_diagf(j, "Expected an `integer` for action.action_id\n");
-                return AR_FAILED_SCRIPT_PARSING;
-            }
-            act->duration = (float)j->number;
         } else if (strncmp(member, "props", 5) == 0){
             if (!jimp_object_begin(j)) {
                 jimp_diagf(j, "Expected the start of an object, '{', for action.props\n");
@@ -461,7 +452,59 @@ static anim_result _parse_action(Jimp *j, Arena *a, anim_action *act) {
     }
 
     if (!jimp_object_end(j)) {
-        jimp_diagf(j, "Expected the end of an object, '}', for action\n");
+        jimp_diagf(j, "Expected the end of an object, '}', for an action\n");
+        return AR_FAILED_SCRIPT_PARSING;
+    }
+    return AR_NONE;
+}
+
+static anim_result _parse_action_group(Jimp *j, Arena *a, anim_action_group *ag) {
+    if (!jimp_object_begin(j)) {
+        jimp_diagf(j, "Expected the start of an object, '{', for action_groups\n");
+        return AR_FAILED_SCRIPT_PARSING;
+    }
+
+    const char *member = NULL;
+    while (jimp_object_member(j)) {
+        member = j->string;
+        if (strncmp(member, "g_id", 4) == 0) {
+            if (!jimp_number(j)) {
+                jimp_diagf(j, "Expected an `integer` for action_group.g_id\n");
+                return AR_FAILED_SCRIPT_PARSING;
+            }
+            ag->id = (uint16_t)j->number;
+        } else if (strncmp(member, "duration", 8) == 0) {
+            if (!jimp_number(j)) {
+                jimp_diagf(j, "Expected an `integer` for action_group.duration\n");
+                return AR_FAILED_SCRIPT_PARSING;
+            }
+            ag->duration = (float)j->number;
+        } else if (strncmp(member, "actions", 7) == 0) {
+            if (!jimp_array_begin(j)) {
+                jimp_diagf(j, "Expected the start of an array, '[', for actions\n");
+                return AR_FAILED_SCRIPT_PARSING;
+            }
+
+            while (jimp_array_item(j)) {
+                anim_action act = {0};
+                anim_result res = _parse_action(j, a, &act);
+                if (res) return res;
+                arena_da_append(a, &ag->items, act);
+            }
+
+            if (!jimp_array_end(j)) {
+                jimp_diagf(j, "Expected the end of an array, ']', for actions\n");
+                return AR_FAILED_SCRIPT_PARSING;
+            }
+        } else {
+            jimp_unknown_member(j);
+            jimp_diagf(j, "Unknown member in action: %s\n", member);
+            return AR_FAILED_SCRIPT_PARSING;
+        }
+    }
+
+    if (!jimp_object_end(j)) {
+        jimp_diagf(j, "Expected the end of an object, '}', for action_groups\n");
         return AR_FAILED_SCRIPT_PARSING;
     }
     return AR_NONE;
@@ -548,18 +591,18 @@ static anim_result _parse_script(Jimp *j, anim_ctx *ctx) {
                 jimp_diagf(j, "Expected the end of an array, ']', for objs\n");
                 return AR_FAILED_SCRIPT_PARSING;
             }
-        } else if (strncmp(member, "actions", 7) == 0) {
+        } else if (strncmp(member, "action_groups", 13) == 0) {
             if (!jimp_array_begin(j)) {
                 jimp_diagf(j, "Expected the start of an array, '[', for objs\n");
                 return AR_FAILED_SCRIPT_PARSING;
             }
 
             while (jimp_array_item(j)) {
-                anim_action action = {0};
-                anim_result res = _parse_action(j, &ctx->arena, &action);
-                ctx->total_duration += action.duration;
+                anim_action_group group = {0};
+                anim_result res = _parse_action_group(j, &ctx->arena, &group);
                 if (res) return res;
-                arena_da_append(&ctx->arena, &ctx->actions, action);
+                ctx->total_duration += group.duration;
+                arena_da_append(&ctx->arena, &ctx->action_groups, group);
             }
 
             if (!jimp_array_end(j)) {
@@ -577,15 +620,17 @@ static anim_result _parse_script(Jimp *j, anim_ctx *ctx) {
 }
 
 static anim_result _anim_obj_get_prop_by_name(
-    anim_obj *obj, const char *prop_name, void **ptr
+    anim_obj *obj, const char *prop_name, void **ptr, anim_prop_type *apt
 ) {
     switch (obj->kind) {
         case AOK_TEXT: {
             const anim_text *t = &obj->as.text;
             if (strncmp(prop_name, "position", 8) == 0) {
                 *ptr = (void*) &t->position;
+                *apt = APT_VEC2;
             } else if (strncmp(prop_name, "color", 5) == 0) {
                 *ptr = (void*) &t->color;
+                *apt = APT_COLOR;
             } else {
                 return AR_UNKNOWN_PROPERTY_NAME;
             }
@@ -594,14 +639,24 @@ static anim_result _anim_obj_get_prop_by_name(
         case AOK_RECT: {
             const anim_rect *r = &obj->as.rect;
             (void) r;
-            // TODO: unimplemented
-            assert(0 && "unimplemented");
-            return AR_UNKNOWN_PROPERTY_NAME;
+            if (strncmp(prop_name, "size", 4) == 0) {
+                *ptr = (void*) &r->size;
+                *apt = APT_VEC2;
+            } else if (strncmp(prop_name, "color", 4) == 0) {
+                *ptr = (void*) &r->color;
+                *apt = APT_COLOR;
+            } else {
+                // TODO: unimplemented
+                printf("ERROR: Unknown rect property name: '%s'\n", prop_name);
+                return AR_UNKNOWN_PROPERTY_NAME;
+            }
+            break;
         }
         case AOK_IMAGE: {
             const anim_rect *img = &obj->as.rect;
             (void) img;
             // TODO: unimplemented
+            printf("ERROR: Unknown image property name: '%s'\n", prop_name);
             assert(0 && "unimplemented");
             return AR_UNKNOWN_PROPERTY_NAME;
         }
@@ -616,13 +671,17 @@ static anim_result _resolve_action_value_ptrs(anim_action_list *actions, anim_ob
             case AAK_V2_INTERP: {
                 anim_v2_interp *vi = &a->as.v2_interp;
                 anim_obj *obj = &objs->items[vi->obj_id];
-                _anim_obj_get_prop_by_name(obj, vi->prop_name, (void*)&vi->value);
+                anim_prop_type apt;
+                _anim_obj_get_prop_by_name(obj, vi->prop_name, (void*)&vi->value, &apt);
+                assert(apt == APT_VEC2);
                 break;
             }
             case AAK_CLR_INTERP: {
                 anim_clr_interp *ci = &a->as.clr_interp;
                 anim_obj *obj = &objs->items[ci->obj_id];
-                _anim_obj_get_prop_by_name(obj, ci->prop_name, (void*)&ci->value);
+                anim_prop_type apt;
+                _anim_obj_get_prop_by_name(obj, ci->prop_name, (void*)&ci->value, &apt);
+                assert(apt == APT_COLOR);
                 break;
             }
             case AAK_WAIT: break;
@@ -632,8 +691,8 @@ static anim_result _resolve_action_value_ptrs(anim_action_list *actions, anim_ob
     return AR_NONE;
 }
 
-static bool anim_action_done(anim_action *a) {
-    return a->t >= a->duration;
+static bool anim_action_group_done(anim_action_group *ag) {
+    return ag->t >= ag->duration;
 }
 
 static float rate_func(float t, float duration, InterpFunc func_type) {
@@ -647,36 +706,39 @@ static float rate_func(float t, float duration, InterpFunc func_type) {
     assert(0 && "unreachable");
 }
 
-static void anim_action_step(anim_action *a, float dt) {
+static void anim_action_group_step(anim_action_group *ag, float dt) {
     float factor;
-    if (anim_action_done(a)) {
+    if (anim_action_group_done(ag)) {
         factor = 1.0;
     } else {
-        factor = rate_func(a->t, a->duration, IF_SINE);
+        factor = rate_func(ag->t, ag->duration, IF_SINE);
     }
-    a->t += dt;
+    ag->t += dt;
 
-    switch (a->kind) {
-        case AAK_V2_INTERP: {
-            anim_v2_interp *vi = &a->as.v2_interp;
-            *vi->value = Vector2Add(
-                vi->start,
-                Vector2Scale(Vector2Subtract(vi->end, vi->start), factor)
-            );
-            break;
+    for (size_t i = 0; i < ag->items.count; i++) {
+        anim_action *act = &ag->items.items[i];
+        switch (act->kind) {
+            case AAK_V2_INTERP: {
+                anim_v2_interp *vi = &act->as.v2_interp;
+                *vi->value = Vector2Add(
+                    vi->start,
+                    Vector2Scale(Vector2Subtract(vi->end, vi->start), factor)
+                );
+                break;
+            }
+            case AAK_CLR_INTERP: {
+                // Taken from raylib.h
+                anim_clr_interp *ci = &act->as.clr_interp;
+                *ci->value = (Color){
+                    (char)((1.0f - factor)*ci->start.r + factor*ci->end.r),
+                    (char)((1.0f - factor)*ci->start.g + factor*ci->end.g),
+                    (char)((1.0f - factor)*ci->start.b + factor*ci->end.b),
+                    (char)((1.0f - factor)*ci->start.a + factor*ci->end.a)
+                };
+                break;
+            }
+            case AAK_WAIT: break;
         }
-        case AAK_CLR_INTERP: {
-            // Taken from raylib.h
-            anim_clr_interp *ci = &a->as.clr_interp;
-            *ci->value = (Color){
-                (char)((1.0f - factor)*ci->start.r + factor*ci->end.r),
-                (char)((1.0f - factor)*ci->start.g + factor*ci->end.g),
-                (char)((1.0f - factor)*ci->start.b + factor*ci->end.b),
-                (char)((1.0f - factor)*ci->start.a + factor*ci->end.a)
-            };
-            break;
-        }
-        case AAK_WAIT: break;
     }
 }
 

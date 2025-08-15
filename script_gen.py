@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import json, os, sys
 
 PX_TO_UNIT: float = 50.0
@@ -114,42 +115,24 @@ class Image(Obj):
         }
 
 
-class Action:
-    action_kinds = ["clrInterp", "v2Interp"]
-    def __init__(self, kind: str, duration: float) -> None:
-        assert kind in Action.action_kinds, (
-            f"(kind: {kind}) not in (Action.action_kinds: {Action.action_kinds})"
-        )
-
-        self.kind: str = kind
-        self.duration = duration
-        self.id: int | None = None
-
-    def set_id(self, id: int) -> None:
-        self.id = id
-
-    def as_dict(self) -> dict:
-        assert self.id is not None
-        return {
-            "kind": self.kind,
-            "action_id": self.id,
-            "duration": self.duration
-        }
+class ActionInfo(ABC):
+    @abstractmethod
+    def props_dict(self) -> dict:
+        pass
 
 
-class ColorInterp(Action):
-    def __init__(self, start: Color, end: Color, obj_id: int | None, prop_name: str, duration: float) -> None:
+class ColorInterpInfo(ActionInfo):
+    def __init__(self, start: Color, end: Color, obj_id: int | None, prop_name: str) -> None:
         assert obj_id is not None, f"obj id must not be None. Maybe add it to a Video object"
 
-        super().__init__("clrInterp", duration)
         self.start: Color = start
         self.end: Color = end
         self.obj_id: int = obj_id
         self.prop_name: str = prop_name
 
-    def as_dict(self) -> dict:
+    def props_dict(self) -> dict:
         return {
-            **super().as_dict(),
+            "kind": "clrInterp",
             "props": {
                 "start": self.start.as_list(),
                 "end": self.end.as_list(),
@@ -159,25 +142,38 @@ class ColorInterp(Action):
         }
 
 
-class Vector2Interp(Action):
-    def __init__(self, start: Vector2, end: Vector2, obj_id: int | None, prop_name: str, duration: float) -> None:
+class Vector2InterpInfo(ActionInfo):
+    def __init__(self, start: Vector2, end: Vector2, obj_id: int | None, prop_name: str) -> None:
         assert obj_id is not None, f"obj id must not be None. Maybe add it to a Video object"
 
-        super().__init__("v2Interp", duration)
         self.start: Vector2 = start
         self.end: Vector2 = end
         self.obj_id: int = obj_id
         self.prop_name: str = prop_name
 
-    def as_dict(self) -> dict:
+    def props_dict(self) -> dict:
         return {
-            **super().as_dict(),
+            "kind": "v2Interp",
             "props": {
                 "start": self.start.as_list(),
                 "end": self.end.as_list(),
                 "obj_id": self.obj_id,
                 "prop_name": self.prop_name
             }
+        }
+
+
+class ActionGroup:
+    def __init__(self, actions, g_id: int, duration: float) -> None:
+        self.duration = duration
+        self.g_id: int = g_id
+        self.actions: list[ActionInfo] = actions
+
+    def as_dict(self) -> dict:
+        return {
+            "g_id": self.g_id,
+            "duration": self.duration,
+            "actions": [ info.props_dict() for info in self.actions ]
         }
 
 
@@ -191,18 +187,18 @@ class Video:
         self.objs: list[Obj] = []
         self.obj_id_counter: int = 0
 
-        self.actions: list[Action] = []
-        self.action_id_counter: int = 0
+        self.groups: list[ActionGroup] = []
+        self.group_id_counter: int = 0
 
     def add_obj(self, obj: Obj) -> None:
         obj.set_id(self.obj_id_counter)
         self.objs.append(obj)
         self.obj_id_counter += 1
 
-    def add_action(self, action: Action) -> None:
-        action.set_id(self.obj_id_counter)
-        self.actions.append(action)
-        self.action_id_counter += 1
+    def add_actions(self, actions: list[ActionInfo], duration: float = 1.0) -> None:
+        ag = ActionGroup(actions, self.group_id_counter, duration)
+        self.groups.append(ag)
+        self.group_id_counter += 1
 
     def as_dict(self) -> dict:
         return {
@@ -213,7 +209,8 @@ class Video:
                 "fps": self.fps
             },
             "objs": [ obj.as_dict() for obj in self.objs ],
-            "actions": [ action.as_dict() for action in self.actions ]
+            # "actions": [ action.as_dict() for action in self.actions ]
+            "action_groups": [ action.as_dict() for action in self.groups ]
         }
 
     def to_json(self, output_path: str, overwrite: bool = False) -> None:
@@ -231,8 +228,16 @@ class Video:
 def main():
     v = Video(1080, 1920, "out1.mov", fps=30)
 
-    img = Image("./example.png", size=Vector2(4.0, 4.0))
-    v.add_obj(img)
+    r = Rect()
+    v.add_obj(r)
+
+    v.add_actions(
+        [
+            Vector2InterpInfo(r.size, Vector2(2, 2), r.id, "size"),
+            ColorInterpInfo(r.color, Color(255, 0, 0, 0), r.id, "color")
+        ],
+        duration=2.0
+    )
 
     v.to_json("test.json", overwrite=True)
 

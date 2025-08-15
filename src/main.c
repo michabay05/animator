@@ -3,14 +3,15 @@
 #include "ffmpeg.h"
 
 int main(void) {
-    SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(800, 600, "Animator Preview");
-
     anim_ctx ctx = {0};
     anim_result res = anim_ctx_init(&ctx, "./test.json");
     if (res) {
         return res;
     }
+
+    SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
+    InitWindow(800, 600, "Animator Preview");
+
     SetTargetFPS(ctx.cfg.fps);
 
     const float ASPECT_RATIO = (float)ctx.cfg.width / (float)ctx.cfg.height;
@@ -33,7 +34,7 @@ int main(void) {
 
     printf("aspect_ratio = %.4f\n", ASPECT_RATIO);
     printf("objs.count = %zu\n", ctx.objs.count);
-    printf("actions.count = %zu\n", ctx.actions.count);
+    printf("actions.count = %zu\n", ctx.action_groups.count);
     printf("ctx.total_duration = %.2f\n", ctx.total_duration);
 
     while (!WindowShouldClose()) {
@@ -55,6 +56,7 @@ int main(void) {
                 .rotation = 0.0f
             };
         }
+
         if (IsKeyPressed(KEY_SPACE)) {
             ctx.paused = !ctx.paused;
         } else if (IsKeyPressed(KEY_S)) {

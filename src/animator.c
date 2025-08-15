@@ -76,6 +76,14 @@ void anim_obj_render(const anim_obj *obj) {
             DrawRectangleV(center, r->size, r->color);
             break;
         }
+        case AOK_IMAGE: {
+            const anim_image *img = &obj->as.image;
+            Vector2 center = Vector2Subtract(img->position, Vector2Scale(img->size, 0.5f));
+            Vector2 orig_size = { img->texture.width, img->texture.height };
+            Vector2 scale_vec = Vector2Divide(img->size, orig_size);
+            float scale = scale_vec.x < scale_vec.y ? scale_vec.x : scale_vec.y;
+            DrawTextureEx(img->texture, center, 0.0f, scale, WHITE);
+        }
     }
 }
 
@@ -199,6 +207,39 @@ static anim_result _parse_rect(Jimp *j, anim_rect *r) {
     return AR_NONE;
 }
 
+static anim_result _parse_image(Jimp *j, anim_image *img) {
+    const char *member = NULL;
+    while (jimp_object_member(j)) {
+        member = j->string;
+        if (strncmp(member, "position", 8) == 0) {
+            if (!_parse_vec2(j, &img->position)) {
+                jimp_diagf(j, "Expected a `Vector2` for obj{image}.position\n");
+                return AR_FAILED_SCRIPT_PARSING;
+            }
+        } else if (strncmp(member, "size", 4) == 0) {
+            if (!_parse_vec2(j, &img->size)) {
+                jimp_diagf(j, "Expected a `Vector2` for obj{image}.size\n");
+                return AR_FAILED_SCRIPT_PARSING;
+            }
+        } else if (strncmp(member, "imagePath", 9) == 0) {
+            if (!jimp_string(j)) {
+                jimp_diagf(j, "Expected a `string` for obj{image}.imagePath\n");
+                return AR_FAILED_SCRIPT_PARSING;
+            }
+
+            // TODO: add check to see if image file exists
+            img->image = LoadImage(j->string);
+            img->texture = LoadTextureFromImage(img->image);
+        } else {
+            jimp_unknown_member(j);
+            jimp_diagf(j, "Unknown member in obj{rect}: %s\n", member);
+            return AR_FAILED_SCRIPT_PARSING;
+        }
+    }
+
+    return AR_NONE;
+}
+
 static anim_result _parse_obj(Jimp *j, Arena *a, anim_obj *obj) {
     if (!jimp_object_begin(j)) {
         jimp_diagf(j, "Expected the start of an object, '{', for an object in objs\n");
@@ -220,6 +261,8 @@ static anim_result _parse_obj(Jimp *j, Arena *a, anim_obj *obj) {
                 obj->kind = AOK_TEXT;
             } else if (strncmp(kind, "rect", 4) == 0) {
                 obj->kind = AOK_RECT;
+            } else if (strncmp(kind, "image", 5) == 0) {
+                obj->kind = AOK_IMAGE;
             } else {
                 jimp_diagf(j, "Unknown kind of object: %s\n", kind);
                 return AR_FAILED_SCRIPT_PARSING;
@@ -245,6 +288,11 @@ static anim_result _parse_obj(Jimp *j, Arena *a, anim_obj *obj) {
                 }
                 case AOK_RECT: {
                     anim_result res = _parse_rect(j, &obj->as.rect);
+                    if (res) return res;
+                    break;
+                }
+                case AOK_IMAGE: {
+                    anim_result res = _parse_image(j, &obj->as.image);
                     if (res) return res;
                     break;
                 }
@@ -547,6 +595,14 @@ static anim_result _anim_obj_get_prop_by_name(
             const anim_rect *r = &obj->as.rect;
             (void) r;
             // TODO: unimplemented
+            assert(0 && "unimplemented");
+            return AR_UNKNOWN_PROPERTY_NAME;
+        }
+        case AOK_IMAGE: {
+            const anim_rect *img = &obj->as.rect;
+            (void) img;
+            // TODO: unimplemented
+            assert(0 && "unimplemented");
             return AR_UNKNOWN_PROPERTY_NAME;
         }
     }

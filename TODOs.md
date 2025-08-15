@@ -1,7 +1,6 @@
 # TODOs
 
 - [ ] (feat) For each render, define a render rectangle for each animation to render within
-- [ ] (feat) Add live script reloading feature
 - [ ] (feat) Add the following cmd args:
     - [ ] (feat) render
     - [ ] (feat) preview
@@ -19,7 +18,6 @@
 - [ ] (feat) Add an on-screen indicator when screen is paused
 - [ ] (feat) Create a python script to generate json script
 - [ ] (feat) Add background color configuration in json script
-- [ ] (feat) Create build system around [tsoding/nob.h](https://github.com/tsoding/nob.h)
 - [ ] (feat) Show progress bar on the bottom for video
 - [ ] Add action interp func customization
 - [ ] Add text font customization
@@ -45,7 +43,9 @@
         - [x] `wait`
 - [x] Implement video rendering using ffmpeg
     - [x] Trigger rendering on key 'r' being pressed
+- [x] (feat) Add live script reloading feature
 - [x] (refactor) Improve the system to add interpolation (or animations) to attributes
 - [x] (feat) Add the following interpolating functions:
     - [x] Linear
     - [x] Sinusoidal
+- [x] (feat) Create build system around [tsoding/nob.h](https://github.com/tsoding/nob.h)

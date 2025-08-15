@@ -8,13 +8,15 @@ int main(void) {
 
     anim_ctx ctx = {0};
     anim_result res = anim_ctx_init(&ctx, "./test.json");
-    if (res) return res;
+    if (res) {
+        return res;
+    }
     SetTargetFPS(ctx.cfg.fps);
 
-    float aspect_ratio = (float)ctx.cfg.width / (float)ctx.cfg.height;
+    const float ASPECT_RATIO = (float)ctx.cfg.width / (float)ctx.cfg.height;
     Vector2 sd = {GetScreenWidth(), GetScreenHeight()};
     float h = sd.y * 0.9f;
-    float w = aspect_ratio * h;
+    float w = ASPECT_RATIO * h;
     Rectangle boundary = {
         .x = w / -2.0f,
         .y = h / -2.0f,
@@ -29,20 +31,28 @@ int main(void) {
         .rotation = 0.0f
     };
 
-    printf("aspect_ratio = %.4f\n", aspect_ratio);
+    printf("aspect_ratio = %.4f\n", ASPECT_RATIO);
     printf("objs.count = %zu\n", ctx.objs.count);
     printf("actions.count = %zu\n", ctx.actions.count);
     printf("ctx.total_duration = %.2f\n", ctx.total_duration);
 
     while (!WindowShouldClose()) {
         if (IsWindowResized()) {
-            h = GetScreenHeight() * 0.9f;
-            w = aspect_ratio * h;
+            sd = (Vector2) {GetScreenWidth(), GetScreenHeight()};
+            h = sd.y * 0.9f;
+            w = ASPECT_RATIO * h;
             boundary = (Rectangle) {
-                .x = 0.5f * ((float)GetScreenWidth() - w),
-                .y = 0.5f * ((float)GetScreenHeight() - h),
+                .x = w / -2.0f,
+                .y = h / -2.0f,
                 .width = w,
                 .height = h,
+            };
+
+            camera = (Camera2D) {
+                .target = Vector2Zero(),
+                .offset = Vector2Scale(sd, 0.5f),
+                .zoom = 1.0f,
+                .rotation = 0.0f
             };
         }
         if (IsKeyPressed(KEY_SPACE)) {

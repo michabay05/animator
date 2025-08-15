@@ -38,9 +38,17 @@ typedef struct {
     Color color;
 } anim_rect;
 
+typedef struct {
+    Vector2 position;
+    Vector2 size;
+    Image image;
+    Texture texture;
+} anim_image;
+
 typedef enum {
     AOK_TEXT,
     AOK_RECT,
+    AOK_IMAGE,
 } anim_obj_kind;
 
 typedef struct {
@@ -49,6 +57,7 @@ typedef struct {
     union {
         anim_text text;
         anim_rect rect;
+        anim_image image;
     } as;
 } anim_obj;
 

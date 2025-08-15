@@ -34,7 +34,7 @@ class Color:
         return [self.r, self.g, self.b, self.a]
 
 class Obj:
-    obj_kinds = ["text", "rect"]
+    obj_kinds = ["text", "rect", "image"]
     def __init__(self, kind: str) -> None:
         assert kind in Obj.obj_kinds, f"(kind: {kind}) not in (Obj.objs_kind: {Obj.obj_kinds})"
 
@@ -90,6 +90,26 @@ class Rect(Obj):
                 "position": self.position.as_list(),
                 "size": self.size.as_list(),
                 "color": self.color.as_list()
+            }
+        }
+
+
+class Image(Obj):
+    def __init__(self, image_path: str, position: Vector2 = Vector2.zero(),
+        size: Vector2 = Vector2.one()
+    ) -> None:
+        super().__init__("image")
+        self.position: Vector2 = position
+        self.size: Vector2 = size
+        self.image_path: str = image_path
+
+    def as_dict(self) -> dict:
+        return {
+            **super().as_dict(),
+            "props": {
+                "position": self.position.as_list(),
+                "size": self.size.as_list(),
+                "imagePath": self.image_path
             }
         }
 
@@ -211,13 +231,8 @@ class Video:
 def main():
     v = Video(1080, 1920, "out1.mov", fps=30)
 
-    t = Text("Hello, world!")
-    v.add_obj(t)
-    # r = Rect()
-    # v.add_obj(r)
-
-    vi = Vector2Interp(t.position, Vector2(1, 1), t.id, "position", 1)
-    v.add_action(vi)
+    img = Image("./example.png", size=Vector2(4.0, 4.0))
+    v.add_obj(img)
 
     v.to_json("test.json", overwrite=True)
 

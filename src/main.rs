@@ -40,10 +40,23 @@ impl<T> Task<T> {
     }
 }
 
+#[derive(Clone, Debug)]
+struct WaitTask {
+    t: f32,
+    duration: f32
+}
+
+impl WaitTask {
+    fn completed(&self) -> bool {
+        return self.t >= self.duration
+    }
+}
+
 #[derive(Debug)]
 enum TaskKind {
     MoveTo(usize, Task<Vector2>),
-    Fade(usize, Task<Color>)
+    Fade(usize, Task<Color>),
+    Wait(WaitTask)
 }
 
 impl TaskKind {
@@ -54,6 +67,9 @@ impl TaskKind {
             },
             TaskKind::MoveTo(_, vt) => {
                 vt.completed()
+            }
+            TaskKind::Wait(wt) => {
+                wt.completed()
             }
         }
     }
@@ -80,8 +96,21 @@ impl Context {
     }
 
     fn update(&mut self, dt: f32) {
+        if rl::is_window_resized() {
+            for obj in &mut self.objs {
+                match obj {
+                    ObjKind::Text(t) => {
+                        t.resize();
+                    }
+                }
+            }
+        }
+
         if rl::is_key_pressed(KeyboardKey::Space) {
             self.paused = !self.paused;
+        }
+        if rl::is_key_pressed(KeyboardKey::R) {
+            unimplemented!();
         }
 
         if self.paused || self.task_idx >= self.tasks.len() {
@@ -112,6 +141,9 @@ impl Context {
                     }
                 }
             }
+            TaskKind::Wait(wt) => {
+                wt.t += dt;
+            }
         }
     }
 
@@ -133,9 +165,16 @@ impl Context {
         color: Color,
     ) -> TextObj {
         let t_obj = TextObj::new(
-            text, font_path, font_size_ratio, position, color, self.objs.len());
+            text, font_path, font_size_ratio, position, color, self.objs.len()
+        );
         self.objs.push(ObjKind::Text(t_obj.clone()));
         t_obj
+    }
+
+    fn wait(&mut self, duration: f32)  {
+        self.tasks.push(
+            TaskKind::Wait(WaitTask { t: 0.0, duration })
+        );
     }
 }
 
@@ -154,6 +193,7 @@ fn main() {
         Color::from_hex(0x3f6d7fff),
     );
     ctx.tasks.push(hdr.fade(Color::RED, 1.5));
+    ctx.wait(1.5);
     ctx.tasks.push(hdr.move_to(Vector2::new(0.3, 0.3), 2.0));
     ctx.tasks.push(hdr.fade(Color::BLUE, 1.0));
 
@@ -167,9 +207,7 @@ fn main() {
         ctx.update(rl::get_frame_time());
 
         rl::begin_drawing();
-
         ctx.render();
-
         rl::draw_fps(15, 15);
         rl::end_drawing();
     }
@@ -187,6 +225,7 @@ struct TextObj {
     color: Color,
     spacing: f32,
     id: usize,
+    dimensions: Vector2,
 }
 
 impl TextObj {
@@ -199,42 +238,49 @@ impl TextObj {
         id: usize
     ) -> Self {
         let mut font = Font::from_path(font_path, font_size_ratio);
-        // font.texture.set_filter(TextureFilter::Bilinear);
+        let spacing = 0.0;
+        let dimensions = rl::measure_text_ex(
+            font.clone(), text,
+            font.base_size as f32,
+            spacing
+        );
         Self {
             text: text.to_string(),
             font_path: font_path.to_string(),
             font_size_ratio,
             font,
-            spacing: 0.0,
+            spacing,
             position,
             color,
-            id
+            id,
+            dimensions
         }
     }
 
     fn resize(&mut self) {
         self.font.reload(&self.font_path, self.font_size_ratio);
+        self.dimensions = rl::measure_text_ex(
+            self.font.clone(), &self.text,
+            self.font.base_size as f32,
+            self.spacing
+        );
     }
 
     fn render(&self) {
-        let font_size = self.font.base_size as f32;
-        let text_dim = rl::measure_text_ex(
-            self.font.clone(), &self.text, font_size, self.spacing
-        );
         let screen_dim = Vector2::new(
             rl::get_screen_width() as f32,
             rl::get_screen_height() as f32,
         );
         let mut pos = Vector2::multiply(self.position, screen_dim);
         pos = Vector2::subtract(
-            pos, Vector2::scale(text_dim, 0.5)
+            pos, Vector2::scale(self.dimensions, 0.5)
         );
 
         rl::draw_text_ex(
             self.font.clone(),
             &self.text,
             pos,
-            font_size,
+            self.font.base_size as f32,
             0.0,
             self.color,
         );

@@ -1,4 +1,6 @@
-use std::ffi::{CStr, CString, c_char, c_float, c_int, c_uint, c_void};
+#![allow(warnings)]
+
+use std::ffi::{CString, c_char, c_float, c_int, c_uint, c_void};
 use std::ptr;
 
 #[link(name = "raylib")]
@@ -14,8 +16,22 @@ unsafe extern "C" {
     fn GetFrameTime() -> c_float;
 
     fn BeginDrawing();
+    fn EndDrawing();
+    fn BeginTextureMode(target: RenderTexture2D);
+    fn EndTextureMode();
+
     fn ClearBackground(color: Color);
-    fn DrawTexture(texture: Texture, posX: c_int, posY: c_int, tint: Color);
+    fn DrawTexture(texture: Texture2D, posX: c_int, posY: c_int, tint: Color);
+    fn DrawTexturePro(
+        texture: Texture2D,
+        source: Rectangle,
+        dest: Rectangle,
+        origin: Vector2,
+        rotation: c_float,
+        tint: Color,
+    );
+    fn DrawLineEx(startPos: Vector2, endPos: Vector2, thick: c_float, color: Color);
+    fn DrawText(text: *const c_char, posX: c_int, posY: c_int, fontSize: c_int, color: Color);
     fn DrawTextEx(
         font: Font,
         text: *const c_char,
@@ -24,8 +40,8 @@ unsafe extern "C" {
         spacing: f32,
         tint: Color,
     );
+    fn DrawRectanglePro(rec: Rectangle, origin: Vector2, rotation: c_float, color: Color);
     fn DrawFPS(posX: c_int, posY: c_int);
-    fn EndDrawing();
 
     fn LoadFontEx(
         fileName: *const c_char,
@@ -38,6 +54,8 @@ unsafe extern "C" {
     fn UnloadImage(image: Image);
     fn LoadTexture(path: *const c_char) -> Texture;
     fn LoadTextureFromImage(image: Image) -> Texture2D;
+    fn LoadImageFromTexture(texture: Texture2D) -> Image;
+    fn LoadRenderTexture(width: c_int, height: c_int) -> RenderTexture;
     fn SetTextureFilter(texture: Texture2D, filter: i32);
     fn UnloadTexture(texture: Texture);
 
@@ -105,6 +123,18 @@ pub fn begin_drawing() {
     unsafe { BeginDrawing() }
 }
 
+pub fn end_drawing() {
+    unsafe { EndDrawing() }
+}
+
+pub fn begin_texture_mode(target: RenderTexture2D) {
+    unsafe { BeginTextureMode(target) }
+}
+
+pub fn end_texture_mode() {
+    unsafe { EndTextureMode() }
+}
+
 pub fn clear_background(color: Color) {
     unsafe { ClearBackground(color) }
 }
@@ -113,6 +143,29 @@ pub fn draw_texture(texture: Texture, pos_x: i32, pos_y: i32, tint: Color) {
     unsafe {
         DrawTexture(texture, pos_x, pos_y, tint);
     }
+}
+
+pub fn draw_texture_pro(
+    texture: Texture2D,
+    source: Rectangle,
+    dest: Rectangle,
+    origin: Vector2,
+    rotation: f32,
+    tint: Color,
+) {
+    unsafe { DrawTexturePro(texture, source, dest, origin, rotation, tint) }
+}
+
+pub fn draw_rectangle_pro(rec: Rectangle, origin: Vector2, rotation: f32, color: Color) {
+    unsafe { DrawRectanglePro(rec, origin, rotation, color) }
+}
+
+pub fn draw_line_ex(start: Vector2, end: Vector2, thickness: f32, color: Color) {
+    unsafe { DrawLineEx(start, end, thickness, color) }
+}
+
+pub fn draw_text(text: &str, pos_x: i32, pos_y: i32, font_size: i32, color: Color) {
+    unsafe { DrawText(to_cstr!(text), pos_x, pos_y, font_size, color) }
 }
 
 pub fn draw_text_ex(
@@ -128,10 +181,6 @@ pub fn draw_text_ex(
 
 pub fn draw_fps(pos_x: i32, pos_y: i32) {
     unsafe { DrawFPS(pos_x, pos_y) };
-}
-
-pub fn end_drawing() {
-    unsafe { EndDrawing() }
 }
 
 pub fn is_key_pressed(key: KeyboardKey) -> bool {
@@ -150,8 +199,8 @@ pub fn measure_text_ex(font: Font, text: &str, font_size: f32, spacing: f32) -> 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct Vector2 {
-    x: f32,
-    y: f32,
+    pub x: f32,
+    pub y: f32,
 }
 
 impl Vector2 {
@@ -176,7 +225,7 @@ impl Vector2 {
     pub fn multiply(a: Self, b: Self) -> Self {
         Self {
             x: a.x * b.x,
-            y: a.y * b.y
+            y: a.y * b.y,
         }
     }
 
@@ -185,6 +234,10 @@ impl Vector2 {
             x: v.x * scalar,
             y: v.y * scalar,
         }
+    }
+
+    pub fn zero() -> Self {
+        Self { x: 0.0, y: 0.0 }
     }
 }
 
@@ -199,9 +252,20 @@ pub struct Color {
 
 impl Color {
     pub const WHITE: Self = Self::from_hex(0xffffffff);
+    pub const BLACK: Self = Self::from_hex(0x000000ff);
     pub const BEIGE_LT: Self = Self::from_hex(0xf5ebe0ff);
-    pub const RED: Self = Self { r: 230, g: 41, b: 55, a: 255 };
-    pub const BLUE: Self = Self {r: 0, g: 121, b: 241, a: 255 };
+    pub const RED: Self = Self {
+        r: 230,
+        g: 41,
+        b: 55,
+        a: 255,
+    };
+    pub const BLUE: Self = Self {
+        r: 0,
+        g: 121,
+        b: 241,
+        a: 255,
+    };
 
     pub const fn from_hex(hex: u32) -> Self {
         // Taken from (https://github.com/raysan5/raylib/blob/master/src/rtextures.c)
@@ -215,11 +279,11 @@ impl Color {
 }
 
 #[repr(C)]
-struct Rectangle {
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
+pub struct Rectangle {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
 }
 
 // NOTE: the actual enum in raylib contains a lot of values
@@ -233,9 +297,9 @@ enum PixelFormat {
 #[repr(C)]
 #[derive(Debug)]
 pub struct Image {
-    data: *const c_void,
-    width: i32,
-    height: i32,
+    pub data: *const c_void,
+    pub width: i32,
+    pub height: i32,
     mipmaps: i32,
     format: PixelFormat,
 }
@@ -243,6 +307,10 @@ pub struct Image {
 impl Image {
     pub fn from_path(path: &str) -> Self {
         unsafe { LoadImage(to_cstr!(path)) }
+    }
+
+    pub fn from_texture(texture: Texture) -> Self {
+        unsafe { LoadImageFromTexture(texture) }
     }
 
     pub fn unload(self) {
@@ -254,8 +322,8 @@ impl Image {
 #[derive(Clone, Debug)]
 pub struct Texture {
     id: u32,
-    width: i32,
-    height: i32,
+    pub width: i32,
+    pub height: i32,
     mipmaps: i32,
     format: i32,
 }
@@ -283,8 +351,25 @@ type Texture2D = Texture;
 #[repr(C)]
 pub enum TextureFilter {
     Point = 0,
-    Bilinear
+    Bilinear,
 }
+
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct RenderTexture {
+    id: u32,
+    pub texture: Texture,
+    depth: Texture,
+}
+
+impl RenderTexture {
+    pub fn new(width: i32, height: i32) -> Self {
+        unsafe { LoadRenderTexture(width, height) }
+    }
+}
+
+// RenderTexture2D, same as RenderTexture
+type RenderTexture2D = RenderTexture;
 
 #[repr(C)]
 pub enum TraceLogLevel {
@@ -348,5 +433,7 @@ pub enum ConfigFlags {
 #[repr(C)]
 pub enum KeyboardKey {
     Space = 32,
+    Minus = 45,
+    Equal = 61,
     R = 82,
 }

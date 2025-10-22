@@ -2,12 +2,12 @@ mod rl;
 
 use std::f32::consts::PI;
 use std::ffi::c_void;
+use std::io::Write;
 use std::os::fd::AsRawFd;
 use std::process::{Child, Command, ExitStatus, Stdio};
 
 use rl::{
-    Color, ConfigFlags, Font, Image, KeyboardKey, Rectangle,
-    RenderTexture, TraceLogLevel, Vector2
+    Color, ConfigFlags, Font, Image, KeyboardKey, Rectangle, RenderTexture, TraceLogLevel, Vector2,
 };
 
 #[derive(Debug)]
@@ -169,7 +169,7 @@ impl Context {
             "fonts/LibertinusSerif-Regular.ttf",
             5.0 / 60.0,
             Vector2::new(0.5, 0.5),
-            Color::WHITE,
+            Color::BLUE,
             self.objs.len(),
         );
         self.objs.push(ObjKind::Text(t_obj.clone()));
@@ -196,26 +196,21 @@ impl Context {
 fn main() {
     rl::set_config_flags(&[ConfigFlags::Msaa4xHint, ConfigFlags::WindowResizable]);
     rl::set_trace_log_level(TraceLogLevel::WARNING);
-    rl::init_window(800, 600, "anim");
+    let factor = 300;
+    let scr_sz = [4 * factor, 3 * factor];
+    rl::init_window(scr_sz[0], scr_sz[1], "anim");
     let fps = 30;
     rl::set_target_fps(fps);
 
     let render_mode = true;
-    let render_width = 1920;
-    let render_height = 1080;
-    let mut ffmpeg = Ffmpeg::start(
-        "out.mp4",
-        render_width,
-        render_height,
-        fps
-    );
-    let rtex = RenderTexture::new(
-        rl::get_screen_width(), rl::get_screen_height()
-    );
+    let render_width = scr_sz[0];
+    let render_height = scr_sz[1];
+    let mut ffmpeg = Ffmpeg::start("out.mp4", render_width, render_height, fps);
+    let rtex = RenderTexture::new(rl::get_screen_width(), rl::get_screen_height());
 
     let mut ctx = Context::new();
-    let mut hdr = ctx.text("SAT Geometry Problem");
     let mut rect = ctx.rect();
+    let mut hdr = ctx.text("SAT Geometry Problem");
 
     ctx.tasks.push(rect.grow(1.5));
     ctx.wait(1.0);
@@ -228,16 +223,19 @@ fn main() {
 
         rl::begin_drawing();
         if render_mode {
+            if ctx.paused {
+                ctx.paused = false;
+            }
             rl::begin_texture_mode(rtex.clone());
             ctx.render();
             rl::end_texture_mode();
 
-            let image = Image::from_texture(rtex.clone().texture);
+            let image = Image::from_texture(rtex.texture.clone());
             ffmpeg.send_frame(&image).unwrap();
             image.unload();
 
             if ctx.completed {
-                eprintln!("[ERROR] Context completed...");
+                eprintln!("[DEBUG] Context completed...");
                 break;
             }
         } else {
@@ -249,7 +247,7 @@ fn main() {
         }
         rl::end_drawing();
     }
-    
+
     dbg!(ffmpeg.stop());
     rl::close_window();
 }
@@ -382,23 +380,22 @@ impl RectObj {
     }
 }
 
-
 struct Ffmpeg {
-    child: Child
+    child: Child,
 }
 
 impl Ffmpeg {
     // const FFMPEG_BINARY: &str = "C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe";
     const FFMPEG_BINARY: &str = "ffmpeg";
-    
+
     #[rustfmt::skip]
     fn start(output_path: &str, width: i32, height: i32, fps: i32) -> Self {
-            let resolution = format!("{}x{}", width, height);
+        let resolution = format!("{}x{}", width, height);
         let framerate = format!("{}", fps);
-        
+
         let child = Command::new(Self::FFMPEG_BINARY)
             .args([
-                // "-loglevel", "verbose",
+                "-loglevel", "verbose",
                 "-y",
 
                 "-f", "rawvideo",
@@ -409,8 +406,8 @@ impl Ffmpeg {
 
                 "-c:v", "libx264",
                 "-vb", "2500k",
-                "-c:a", "aac",
-                "-ab", "200k",
+                // "-c:a", "aac",
+                // "-ab", "200k",
                 "-pix_fmt", "yuv420p",
                 output_path,
             ])
@@ -425,16 +422,18 @@ impl Ffmpeg {
         if let Some(ref c_in) = self.child.stdin {
             let raw_fd = c_in.as_raw_fd();
             let mut count = 0;
-            for y in (0..image.height).rev() {
+            for y in (1..=image.height).rev() {
                 // Source: https://github.com/tsoding/panim/blob/main/panim/ffmpeg_linux.c
 
                 // stride: sizeof(uint32_t)*width
-                let u32_size = (u32::BITS / 8) as i32;
-                let stride = (u32_size * image.width) as usize;
+                let u32_size = (u32::BITS / 8) as usize;
+                let stride = u32_size * image.width as usize;
 
                 // let buf = (image.data as *const u32).wrapping_add(((y - 1)*image.width) as usize);
-                let buf = (image.data as *const u32).wrapping_add((y*image.width) as usize);
-                if unsafe { libc::write(raw_fd, buf as *const c_void, stride) < 0 } {
+                // let buf = (image.data as *const u32).wrapping_add((y * image.width) as usize);
+                let buf =
+                    unsafe { (image.data as *const u32).add(((y - 1) * image.width) as usize) };
+                if unsafe { libc::write(raw_fd, buf as *const c_void, stride) } < 0 {
                     eprintln!("{} successful rows have been written", count);
                     return Err(format!("FFMPEG: failed to write frame into ffmpeg's stdin"));
                 } else {
@@ -447,13 +446,15 @@ impl Ffmpeg {
         }
     }
 
-    fn stop(&mut self) -> Option<ExitStatus> {
+    fn stop(&mut self) -> ExitStatus {
         // self.child.wait().unwrap().code()
-        self.child.try_wait().unwrap()
+        if let Some(ref mut c_in) = self.child.stdin {
+            let _ = c_in.flush();
+        }
+        self.child.stdin.take();
+        self.child.wait().unwrap()
     }
 }
-
-
 
 trait Interp {
     fn interp(&mut self, dt: f32, info: &mut Task<Self>)
@@ -476,15 +477,16 @@ impl Interp for Vector2 {
 impl Interp for Color {
     fn interp(&mut self, dt: f32, task: &mut Task<Self>) {
         let factor = rate_func(task.t, task.duration);
+        let inv_factor = 1.0f32 - factor;
         task.t += dt;
 
         let start = task.start;
         let end = task.end;
         *self = Self {
-            r: ((1.0f32 - factor) * start.r as f32 + factor * end.r as f32) as u8,
-            g: ((1.0f32 - factor) * start.g as f32 + factor * end.g as f32) as u8,
-            b: ((1.0f32 - factor) * start.b as f32 + factor * end.b as f32) as u8,
-            a: ((1.0f32 - factor) * start.a as f32 + factor * end.a as f32) as u8,
+            r: (inv_factor * start.r as f32 + factor * end.r as f32) as u8,
+            g: (inv_factor * start.g as f32 + factor * end.g as f32) as u8,
+            b: (inv_factor * start.b as f32 + factor * end.b as f32) as u8,
+            a: (inv_factor * start.a as f32 + factor * end.a as f32) as u8,
         };
     }
 }

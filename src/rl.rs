@@ -424,6 +424,14 @@ impl Font {
     }
 }
 
+#[repr(C)]
+struct Camera2D {
+    offset: Vector2,
+    target: Vector2,
+    rotation: f32,
+    zoom: f32,
+}
+
 #[derive(Copy, Clone)]
 pub enum ConfigFlags {
     Msaa4xHint = 0x00000020,

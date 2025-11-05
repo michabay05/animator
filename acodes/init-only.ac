@@ -1,0 +1,4 @@
+INIT {
+    0 RECT
+    1 TEXT "Hello world"
+}

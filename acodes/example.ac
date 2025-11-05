@@ -1,0 +1,24 @@
+INIT {
+    0 RECT
+    1 TEXT "Hello world"
+}
+
+LOOP {
+    // List of individual actions (that will ran to completion)
+    GROW 0 1.5
+    WAIT 1.0
+    FADE 1 c(255, 0, 0, 255) 1.5
+    WAIT 1.0
+    MOVE 0 v2(0.3, 0.8) 2.0
+
+    // Group of actions to run in parallel
+    GROUP A ids[0 1 2 3]
+    MOVE A v2(1.3 3.2) 1.5
+
+    // Repeat the same action
+    LABEL A 5
+        FADE 1 c(0, 0, 0, 255) 1.5
+        MOVE 0 v2(0, 0) 1.5
+        WAIT 1.0
+    BACK A
+}

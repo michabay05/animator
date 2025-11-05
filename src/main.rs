@@ -1,10 +1,16 @@
+mod acode;
 mod engine;
 mod rl;
 
 use rl::{Color, ConfigFlags, Image, Vector2, RenderTexture, TraceLogLevel};
 use engine::{Context, Ffmpeg};
 
+
 fn main() {
+    acode::acode_test();
+}
+
+fn engine_expr() {
     rl::set_config_flags(&[ConfigFlags::Msaa4xHint, ConfigFlags::WindowResizable]);
     rl::set_trace_log_level(TraceLogLevel::WARNING);
     let factor = 300;

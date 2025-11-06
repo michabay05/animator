@@ -239,6 +239,10 @@ impl Vector2 {
     pub fn zero() -> Self {
         Self { x: 0.0, y: 0.0 }
     }
+
+    pub fn one() -> Self {
+        Self { x: 1.0, y: 1.0 }
+    }
 }
 
 #[repr(C)]

@@ -1,11 +1,12 @@
 INIT {
-    0 RECT
-    1 TEXT "Hello world"
+    RECT;
+    TEXT "Hello world";
+    TEXT "Wsg ma boi";
 }
 
 LOOP {
-    GROW 0 1.5
-    WAIT 1.0
-    FADE 1 c(255 0 0 255) 1.5
-    MOVE 0 v2(3 3) 1
+    GROW 0 1.5;
+    WAIT 2.34;
+    FADE 1 c(255 0 0 255) 1.5;
+    MOVE 2 v2(3 3) 1;
 }

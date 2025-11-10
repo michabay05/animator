@@ -50,6 +50,7 @@ unsafe extern "C" {
         codepointCount: c_int,
     ) -> Font;
     fn UnloadFont(font: Font);
+    fn GetFontDefault() -> Font;
     fn LoadImage(path: *const c_char) -> Image;
     fn UnloadImage(image: Image);
     fn LoadTexture(path: *const c_char) -> Texture;
@@ -283,11 +284,23 @@ impl Color {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Rectangle {
     pub x: f32,
     pub y: f32,
     pub width: f32,
     pub height: f32,
+}
+
+impl Rectangle {
+    pub fn from_vec2(pos: Vector2, size: Vector2) -> Self {
+        Self {
+            x: pos.x,
+            y: pos.y,
+            width: size.x,
+            height: size.y,
+        }
+    }
 }
 
 // NOTE: the actual enum in raylib contains a lot of values
@@ -408,6 +421,10 @@ pub struct Font {
 }
 
 impl Font {
+    pub fn default() -> Font {
+        unsafe { GetFontDefault() }
+    }
+
     pub fn from_path(path: &str, font_size_ratio: f32) -> Self {
         let min_side = if get_screen_width() > get_screen_height() {
             get_screen_height()

@@ -14,6 +14,7 @@ enum Token {
     Text(String),
     ColorDef,
     Vector2Def,
+    On, Off,
 
     // Phases
     Init,
@@ -178,6 +179,8 @@ impl Lexer {
             "WAIT" => Some(Token::Wait),
             "FADE" => Some(Token::Fade),
             "MOVE" => Some(Token::Move),
+            "ON" => Some(Token::On),
+            "OFF" => Some(Token::Off),
             _ => None,
         }
     }
@@ -205,6 +208,8 @@ pub enum Instruction {
     Wait(f32),
     Fade(usize, Color, f32),
     Move(usize, Vector2, f32),
+    Enable(usize),
+    Disable(usize),
 }
 
 impl Parser {
@@ -212,9 +217,10 @@ impl Parser {
         Self { tokens }
     }
 
-    fn parse(&mut self) -> Vec<Instruction> {
+    fn parse(&mut self) -> (Vec<Instruction>, Vec<Instruction>) {
         let mut i: usize = 0;
-        let mut inst = Vec::<Instruction>::new();
+        let mut setup_insts = Vec::<Instruction>::new();
+        let mut loop_insts = Vec::<Instruction>::new();
 
         while i < self.tokens.len() {
             let t = &self.tokens[i];
@@ -236,7 +242,7 @@ impl Parser {
                             _ => unreachable!()
                         };
 
-                        inst.push(Instruction::Create(create_kind));
+                        setup_insts.push(Instruction::Create(create_kind));
                         self.consume_expect(&mut i, &[Token::Semicolon]);
                     }
 
@@ -249,38 +255,47 @@ impl Parser {
 
                     while !self.peek_expect(i, &[Token::Ccurly]) {
                         let act_tok = self.consume_expect(&mut i,
-                            &[Token::Grow, Token::Move, Token::Fade, Token::Wait]
+                            &[Token::Grow, Token::Move, Token::Fade, Token::Wait, Token::On,
+                                Token::Off]
                         );
 
                         let stmt = match *act_tok {
                             Token::Grow => {
-                                let id = self.consume_expect_number(&mut i);
+                                let ind = self.consume_expect_number(&mut i);
                                 let duration = self.consume_expect_number(&mut i);
-                                Instruction::Grow(id as usize, duration)
+                                Instruction::Grow(ind as usize, duration)
                             }
                             Token::Wait => {
                                 let duration = self.consume_expect_number(&mut i);
                                 Instruction::Wait(duration)
                             }
                             Token::Fade => {
-                                let id = self.consume_expect_number(&mut i);
+                                let ind = self.consume_expect_number(&mut i);
                                 let color = self.consume_color(&mut i);
                                 let duration = self.consume_expect_number(&mut i);
-                                Instruction::Fade(id as usize, color, duration)
+                                Instruction::Fade(ind as usize, color, duration)
                             }
                             Token::Move => {
-                                let id = self.consume_expect_number(&mut i);
+                                let ind = self.consume_expect_number(&mut i);
                                 let pos = self.consume_v2(&mut i);
                                 let duration = self.consume_expect_number(&mut i);
-                                Instruction::Move(id as usize, pos, duration)
+                                Instruction::Move(ind as usize, pos, duration)
+                            }
+                            Token::On => {
+                                let ind = self.consume_expect_number(&mut i);
+                                Instruction::Enable(ind as usize)
+                            }
+                            Token::Off => {
+                                let ind = self.consume_expect_number(&mut i);
+                                Instruction::Disable(ind as usize)
                             }
                             _ => {
-                                eprintln!("{:?}", inst);
+                                eprintln!("{:?}", loop_insts);
                                 unreachable!("Unsure what to do with: {:?}", *act_tok);
                             }
                         };
 
-                        inst.push(stmt);
+                        loop_insts.push(stmt);
                         self.consume_expect(&mut i, &[Token::Semicolon]);
                     }
 
@@ -290,7 +305,7 @@ impl Parser {
             }
         }
 
-        inst
+        (setup_insts, loop_insts)
     }
 
     fn consume_expect(&self, i: &mut usize, expected: &[Token]) -> &Token {
@@ -363,7 +378,7 @@ impl Parser {
     }
 }
 
-pub fn parse(filepath: &str) -> Vec<Instruction> {
+pub fn parse(filepath: &str) -> (Vec<Instruction>, Vec<Instruction>) {
     let mut lexer = Lexer::from_file(filepath);
     let tokens = lexer.tokenize();
     // println!("{:?}", tokens);

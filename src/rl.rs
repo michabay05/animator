@@ -19,6 +19,8 @@ unsafe extern "C" {
     fn EndDrawing();
     fn BeginTextureMode(target: RenderTexture2D);
     fn EndTextureMode();
+    fn BeginMode2D(camera: Camera2D);
+    fn EndMode2D();
 
     fn ClearBackground(color: Color);
     fn DrawTexture(texture: Texture2D, posX: c_int, posY: c_int, tint: Color);
@@ -37,6 +39,16 @@ unsafe extern "C" {
         text: *const c_char,
         position: Vector2,
         fontSize: c_float,
+        spacing: f32,
+        tint: Color,
+    );
+    fn DrawTextPro(
+        font: Font,
+        text: *const c_char,
+        position: Vector2,
+        origin: Vector2,
+        rotation: f32,
+        fontSize: f32,
         spacing: f32,
         tint: Color,
     );
@@ -72,6 +84,7 @@ unsafe extern "C" {
     ) -> Vector2;
 }
 
+#[macro_export]
 macro_rules! to_cstr {
     ($s:expr) => {
         CString::new($s).unwrap().as_ptr()
@@ -136,6 +149,14 @@ pub fn end_texture_mode() {
     unsafe { EndTextureMode() }
 }
 
+pub fn begin_mode_2d(camera: Camera2D) {
+    unsafe { BeginMode2D(camera) }
+}
+
+pub fn end_mode_2d(camera: Camera2D) {
+    unsafe { EndMode2D() }
+}
+
 pub fn clear_background(color: Color) {
     unsafe { ClearBackground(color) }
 }
@@ -178,6 +199,30 @@ pub fn draw_text_ex(
     tint: Color,
 ) {
     unsafe { DrawTextEx(font, to_cstr!(text), position, font_size, spacing, tint) }
+}
+
+pub fn draw_text_pro(
+    font: Font,
+    text: &str,
+    position: Vector2,
+    origin: Vector2,
+    rotation: f32,
+    fontSize: f32,
+    spacing: f32,
+    tint: Color,
+) {
+    unsafe {
+        DrawTextPro(
+            font,
+            to_cstr!(text),
+            position,
+            origin,
+            rotation,
+            fontSize,
+            spacing,
+            tint,
+        )
+    }
 }
 
 pub fn draw_fps(pos_x: i32, pos_y: i32) {
@@ -446,11 +491,12 @@ impl Font {
 }
 
 #[repr(C)]
-struct Camera2D {
-    offset: Vector2,
-    target: Vector2,
-    rotation: f32,
-    zoom: f32,
+#[derive(Clone)]
+pub struct Camera2D {
+    pub offset: Vector2,
+    pub target: Vector2,
+    pub rotation: f32,
+    pub zoom: f32,
 }
 
 #[derive(Copy, Clone)]

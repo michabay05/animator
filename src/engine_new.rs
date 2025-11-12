@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use crate::acode::{self, Instruction, ObjInfo};
-use crate::rl::{self, Color, ConfigFlags, Font, Rectangle, TraceLogLevel, Vector2};
+use crate::rl::{self, Camera2D, Color, ConfigFlags, Font, Rectangle, TraceLogLevel, Vector2};
 
 const UNIT_TO_PX: f32 = 50.0;
 // So, 1 unit = UNIT_TO_PX px
@@ -11,14 +11,19 @@ struct RectInfo {
     position: Vec2,
     size: Vec2,
     color: Color,
+    origin: Vec2,
 }
 
 impl Default for RectInfo {
     fn default() -> Self {
+        let pos = Vec2::Relative(0.0, 0.0);
+        let size = Vec2::Relative(1.0, 1.0);
+        let origin = Vector2::add(pos.vec2(), Vector2::scale(size.vec2(), 0.5));
         Self {
-            position: Vec2::Relative(2.0, 2.0),
-            size: Vec2::Relative(1.0, 1.0),
+            position: pos,
+            size,
             color: Color::WHITE,
+            origin: Vec2::Relative(origin.x, origin.y),
         }
     }
 }
@@ -26,16 +31,29 @@ impl Default for RectInfo {
 #[derive(Debug)]
 struct TextInfo {
     text: String,
+    font_size: f32,
     position: Vec2,
     color: Color,
+    size: Vec2,
+    origin: Vec2,
 }
 
 impl TextInfo {
     fn default(s: &str) -> Self {
+        let pos = Vec2::Relative(0.0, 0.0);
+        let font_size: f32 = 30.0;
+        let sz = Vector2::scale(
+            rl::measure_text_ex(Font::default(), s, font_size, 0.0),
+            1.0 / UNIT_TO_PX,
+        );
+        let origin = Vector2::add(pos.vec2(), Vector2::scale(sz, 0.5));
         Self {
             text: s.to_string(),
-            position: Vec2::Relative(0.0, 0.0),
+            font_size,
+            position: pos,
             color: Color::WHITE,
+            size: Vec2::Relative(sz.x, sz.y),
+            origin: Vec2::Relative(origin.x, origin.y),
         }
     }
 }
@@ -77,10 +95,13 @@ struct Context {
     bounds: Option<InterpBounds>,
     inst_ind: usize,
     t: f32,
+
+    camera: Camera2D,
+    fps: i32,
 }
 
 impl Context {
-    fn from_path(filepath: &str) -> Self {
+    fn from_path(filepath: &str, dimension: (i32, i32)) -> Self {
         let (setup_insts, loop_insts) = acode::parse(filepath);
         let mut this = Self {
             objs: vec![],
@@ -89,12 +110,22 @@ impl Context {
             bounds: None,
             inst_ind: 0,
             t: 0.0,
+
+            fps: 60,
+            camera: Camera2D {
+                offset: Vec2::Absolute(0.5 * dimension.0 as f32, 0.5 * dimension.1 as f32)
+                    .absolute(),
+                target: Vec2::Absolute(0.0, 0.0).absolute(),
+                rotation: 0.0,
+                zoom: 1.0,
+            },
         };
         this.setup();
         this
     }
 
     fn setup(&mut self) {
+        rl::set_target_fps(self.fps);
         for inst in &self.setup_insts {
             match inst {
                 Instruction::Create(info) => match info {
@@ -116,7 +147,9 @@ impl Context {
     }
 
     fn update(&mut self, dt: f32) {
-        if self.inst_ind >= self.loop_insts.len() { return }
+        if self.inst_ind >= self.loop_insts.len() {
+            return;
+        }
 
         let inst = &self.loop_insts[self.inst_ind];
         match inst {
@@ -138,8 +171,17 @@ impl Context {
                         let (start, end) = self.bounds.unwrap().unwrap_vec2();
                         ri.size = ri.size.interp(start, end, self.t, *duration);
                     }
+                    ObjKind::Text(ti) => {
+                        if self.bounds.is_none() {
+                            self.bounds = Some(InterpBounds::Scalar(0.0, ti.font_size));
+                        }
+
+                        let (start, end) = self.bounds.unwrap().unwrap_f32();
+                        ti.font_size = ti.font_size.interp(start, end, self.t, *duration);
+                    }
                     _ => unreachable!("Idk how to 'Grow' {:?}", obj),
                 }
+
                 self.t += dt;
                 if self.t >= *duration {
                     self.move_on();
@@ -152,13 +194,27 @@ impl Context {
                 match &mut obj.kind {
                     ObjKind::Rect(ri) => {
                         if self.bounds.is_none() {
-                            self.bounds = Some(InterpBounds::Vec2(ri.position, Vec2::Relative(target.x, target.y)));
+                            self.bounds = Some(InterpBounds::Vec2(
+                                ri.position,
+                                Vec2::Relative(target.x, target.y),
+                            ));
                         }
 
                         let (start, end) = self.bounds.unwrap().unwrap_vec2();
                         ri.position = ri.position.interp(start, end, self.t, *duration);
                     }
-                    _ => unreachable!("Idk how to 'Fade' {:?}", obj),
+                    ObjKind::Text(ti) => {
+                        if self.bounds.is_none() {
+                            self.bounds = Some(InterpBounds::Vec2(
+                                ti.position,
+                                Vec2::Relative(target.x, target.y),
+                            ));
+                        }
+
+                        let (start, end) = self.bounds.unwrap().unwrap_vec2();
+                        ti.position = ti.position.interp(start, end, self.t, *duration);
+                    }
+                    _ => unreachable!("Idk how to 'Move' {:?}", obj),
                 }
                 self.t += dt;
                 if self.t >= *duration {
@@ -181,6 +237,14 @@ impl Context {
                         let (start, end) = self.bounds.unwrap().unwrap_clr();
                         ri.color = ri.color.interp(start, end, self.t, *duration);
                     }
+                    ObjKind::Text(ti) => {
+                        if self.bounds.is_none() {
+                            self.bounds = Some(InterpBounds::Clr(ti.color, *target));
+                        }
+
+                        let (start, end) = self.bounds.unwrap().unwrap_clr();
+                        ti.color = ti.color.interp(start, end, self.t, *duration);
+                    }
                     _ => unreachable!("Idk how to 'Fade' {:?}", obj),
                 }
                 self.t += dt;
@@ -200,6 +264,7 @@ impl Context {
     }
 
     fn render(&self) {
+        rl::begin_mode_2d(self.camera.clone());
         rl::clear_background(Color::BLACK);
 
         for obj in &self.objs {
@@ -211,19 +276,23 @@ impl Context {
                 ObjKind::Rect(ri) => {
                     rl::draw_rectangle_pro(
                         Rectangle::from_vec2(ri.position.absolute(), ri.size.absolute()),
-                        Vector2::zero(),
+                        ri.origin.absolute(),
                         0.0,
                         ri.color,
                     );
                 }
-                ObjKind::Text(ti) => rl::draw_text_ex(
-                    Font::default(),
-                    &ti.text,
-                    ti.position.absolute(),
-                    30.0,
-                    0.0,
-                    ti.color,
-                ),
+                ObjKind::Text(ti) => {
+                    rl::draw_text_pro(
+                        Font::default(),
+                        ti.text.as_str(),
+                        ti.position.absolute(),
+                        ti.origin.absolute(),
+                        0.0,
+                        ti.font_size,
+                        0.0,
+                        ti.color,
+                    );
+                }
             }
         }
     }
@@ -233,10 +302,10 @@ pub fn engine_expr() {
     rl::set_config_flags(&[ConfigFlags::Msaa4xHint, ConfigFlags::WindowResizable]);
     rl::set_trace_log_level(TraceLogLevel::WARNING);
     let factor = 300;
-    let scr_sz = [4 * factor, 3 * factor];
-    rl::init_window(scr_sz[0], scr_sz[1], "anim");
+    let scr_sz: (i32, i32) = (4 * factor, 3 * factor);
+    rl::init_window(scr_sz.0, scr_sz.1, "anim");
 
-    let mut ctx = Context::from_path("acodes/simple.ac");
+    let mut ctx = Context::from_path("acodes/simple.ac", scr_sz);
 
     while !rl::window_should_close() {
         ctx.update(rl::get_frame_time());
@@ -254,10 +323,10 @@ fn rate_func(t: f32, duration: f32) -> f32 {
         1.0
     } else {
         // >> Linear
-        // t / duration
+        t / duration
 
         // >> Sinusoidal
-        -0.5 * ((PI / duration) * t).cos() + 0.5
+        // -0.5 * ((PI / duration) * t).cos() + 0.5
     }
 }
 
@@ -293,11 +362,20 @@ impl Vec2 {
 
 #[derive(Clone, Copy, Debug)]
 enum InterpBounds {
+    Scalar(f32, f32),
     Vec2(Vec2, Vec2),
     Clr(Color, Color),
 }
 
 impl InterpBounds {
+    fn unwrap_f32(self) -> (f32, f32) {
+        if let Self::Scalar(s, e) = self {
+            (s, e)
+        } else {
+            panic!("Try to unwrap as f32 but failed; it was {:?}", self);
+        }
+    }
+
     fn unwrap_vec2(self) -> (Vector2, Vector2) {
         if let Self::Vec2(s, e) = self {
             (s.vec2(), e.vec2())
@@ -319,6 +397,13 @@ trait Interp {
     fn interp(self, start: Self, end: Self, t: f32, duration: f32) -> Self
     where
         Self: Sized;
+}
+
+impl Interp for f32 {
+    fn interp(self, start: Self, end: Self, t: f32, duration: f32) -> Self {
+        let factor = rate_func(t, duration);
+        start + factor * (end - start)
+    }
 }
 
 impl Interp for Vector2 {

@@ -93,6 +93,24 @@ impl Lexer {
                     tokens.push(Token::ColorDef);
                     i += 1;
                 }
+                '-' => {
+                    if let Some(c) = self.peek(i) {
+                        if c.is_ascii_digit() {
+                            // Move on from the negative symbol
+                            i += 1;
+                            // Parse as negative number as positive
+                            let start = i;
+                            self.consume_num(&mut i);
+                            let s = str::from_utf8(&self.source[start..i]).unwrap();
+                            // Multiply the final number with -1.0
+                            tokens.push(Token::Number(-1.0 * s.parse::<Number>().unwrap()));
+                        } else {
+                            assert!(false, "[L{}] Unknown vector size: {c}", self.line)
+                        }
+                    } else {
+                        assert!(false, "[L{}] Unsure what to do with 'v' on its own...", self.line);
+                    }
+                }
                 'v' => {
                     if let Some(c) = self.peek(i) {
                         if c == '2' {

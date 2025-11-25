@@ -1,0 +1,19 @@
+import "t.um"
+
+fn compute_area(a, b: real32): real32 {
+    printf("a = %v\n", a);
+    printf("b = %v\n", b);
+    return a*b;
+}
+
+fn vec2_add(a, b: t::vec2): t::vec2 {
+    printf("a = %v\n", a);
+    printf("b = %v\n", b);
+	printf("v = %v\n", t::vec2{a.x+b.x, a.y+b.y});
+	return t::vec2{a.x+b.x, a.y+b.y};
+}
+
+fn color_disappear(a: t::color): t::color {
+    a.a = 0;
+    return a;
+}

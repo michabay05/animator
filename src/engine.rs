@@ -432,6 +432,7 @@ impl Ffmpeg {
         }
 
         let child = self.child.as_mut().unwrap();
+        assert!(false, "Bad code below; stay away...");
 
         if let Some(ref c_in) = child.stdin {
             let raw_fd = c_in.as_raw_fd();
@@ -447,7 +448,7 @@ impl Ffmpeg {
                 // let buf = (image.data as *const u32).wrapping_add((y * image.width) as usize);
                 let buf =
                     unsafe { (image.data as *const u32).add(((y - 1) * image.width) as usize) };
-                if unsafe { libc::write(raw_fd, buf as *const c_void, stride) } < 0 {
+                if true {
                     eprintln!("{} successful rows have been written", count);
                     self.is_rendering = false;
                     return Err(format!("FFMPEG: failed to write frame into ffmpeg's stdin"));

@@ -1,4 +1,0 @@
-INIT {
-    RECT;
-    TEXT "Hello world";
-}

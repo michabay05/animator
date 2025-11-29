@@ -38,7 +38,7 @@ fn get_tasks(): [MAX_TASK_COUNT]Task {
 fn sequence(): void {
     white := Color{255, 255, 255, 255};
     r1 := newRect(Vec2{0,0}, Vec2{1,1}, white);
-    r2 := newRect(Vec2{2,0}, Vec2{1,1}, white);
+    r2 := newRect(Vec2{2,2}, Vec2{1,1}, white);
     printf("%v\n", r1);
     printf("%v\n", r2);
 

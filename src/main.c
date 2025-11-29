@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ffmpeg.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "umka_api.h"
@@ -274,6 +275,10 @@ int main(void)
     InitWindow(800, 600, "pas");
     SetTargetFPS(60);
 
+    RenderTexture2D rtex = LoadRenderTexture(800, 600);
+    FFMPEG *ffmpeg = ffmpeg_start_rendering_video(
+        "out.mp4", rtex.texture.width, rtex.texture.height, 30);
+
     const int UNIT_TO_PX = 50;
     Vector2 dimension = {(f32)GetScreenWidth(), (f32)GetScreenHeight()};
     Camera2D cam = {
@@ -288,9 +293,11 @@ int main(void)
         start[i] = rl.items[i].color;
     }
 
-    while (!WindowShouldClose()) {
+    bool quit = false;
+    while (!quit && !WindowShouldClose()) {
         if (!paused) {
-            f32 dt = GetFrameTime();
+            // f32 dt = GetFrameTime();
+            f32 dt = 1.0f/30.0f;
 
             if (current < tl.count) {
                 Task task = tl.items[current];
@@ -341,30 +348,45 @@ int main(void)
                     } else {
                         printf("paused...\n");
                         paused = true;
+                        quit = true;
                     }
                 }
             }
         }
 
-        BeginDrawing();
-        ClearBackground(BLACK);
+        BeginTextureMode(rtex); {
+            ClearBackground(BLACK);
 
-        BeginMode2D(cam);
-        for (int i = 0; i < rl.count; i++) {
-            Rect r = rl.items[i];
-            Vector2 pos = Vector2Scale(from_dv2(r.position), UNIT_TO_PX);
-            Vector2 size = Vector2Scale(from_dv2(r.size), UNIT_TO_PX);
-            pos = Vector2Subtract(pos, Vector2Scale(size, 0.5));
-            DrawRectangleV(pos, size, r.color);
-        }
+            BeginMode2D(cam);
+            for (int i = 0; i < rl.count; i++) {
+                Rect r = rl.items[i];
+                Vector2 pos = Vector2Scale(from_dv2(r.position), UNIT_TO_PX);
+                Vector2 size = Vector2Scale(from_dv2(r.size), UNIT_TO_PX);
+                pos = Vector2Subtract(pos, Vector2Scale(size, 0.5));
+                DrawRectangleV(pos, size, r.color);
+            }
+            EndMode2D();
 
-        Vector2 txt_pos = GetScreenToWorld2D((Vector2){10, 10}, cam);
-        DrawFPS((int)txt_pos.x, (int)txt_pos.y);
-        if (paused) DrawText("Paused", (int)txt_pos.x, (int)txt_pos.y + 25, 20, WHITE);
-        EndMode2D();
+            SetTraceLogLevel(LOG_WARNING);
+            Image image = LoadImageFromTexture(rtex.texture);
+            SetTraceLogLevel(LOG_INFO);
+            if (!ffmpeg_send_frame_flipped(ffmpeg, image.data, image.width, image.height)) {
+                ffmpeg_end_rendering(ffmpeg, true);
+            }
+            UnloadImage(image);
 
-        EndDrawing();
+        } EndTextureMode();
+
+        BeginDrawing(); {
+            ClearBackground(BLACK);
+
+            Vector2 txt_pos = GetScreenToWorld2D((Vector2){10, 10}, cam);
+            DrawFPS((int)txt_pos.x, (int)txt_pos.y);
+            if (paused) DrawText("Paused", (int)txt_pos.x, (int)txt_pos.y + 25, 20, WHITE);
+        } EndDrawing();
     }
+
+    ffmpeg_end_rendering(ffmpeg, false);
 
     CloseWindow();
     umkaFree(umka);

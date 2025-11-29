@@ -1,13 +1,13 @@
-fn fade_in*(id: Id, delay: real = 0.0): Action {
-    return Action{ ActionKind.FadeIn, delay };
+fn fade_in(id: Id, delay: real = 0.0): Action {
+    return Action{ id, ActionKind.FadeIn, delay };
 }
 
-fn fade_out*(id: Id, delay: real = 0.0): Action {
-    return Action{ ActionKind.FadeOut, delay };
+fn fade_out(id: Id, delay: real = 0.0): Action {
+    return Action{ id, ActionKind.FadeOut, delay };
 }
 
-fn sleep*(delay: real = 0.0): Action {
-    return Action{ ActionKind.Sleep, delay };
+fn sleep(delay: real = 0.0): Action {
+    return Action{ -1, ActionKind.Sleep, delay };
 }
 
 fn play*(actions: []Action, duration: real = 1.0): void {
@@ -36,12 +36,17 @@ fn get_tasks(): [MAX_TASK_COUNT]Task {
 
 
 fn sequence(): void {
-    r1 := newRect();
+    white := Color{255, 255, 255, 255};
+    r1 := newRect(Vec2{0,0}, Vec2{1,1}, white);
+    r2 := newRect(Vec2{2,0}, Vec2{1,1}, white);
+    printf("%v\n", r1);
+    printf("%v\n", r2);
 
     play({fade_in(r1.id, 0.1)});
-    play({sleep(1.0)}, 3.1415);
-    play({fade_out(r1.id)});
-    play({sleep(1.0)}, 3.1415);
+    play({sleep(1.0)}, 2);
+    play({fade_in(r2.id)});
+    play({sleep(1.0)}, 2);
+    play({fade_out(r1.id, 0.1), fade_out(r2.id, 0.1)});
 }
 
 fn main(): void {

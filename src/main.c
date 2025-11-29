@@ -24,18 +24,11 @@
 
 typedef float f32;
 typedef double f64;
-typedef uint16_t Id;
+typedef int16_t Id;
 
 typedef struct {
     f64 x, y;
 } DVector2;
-
-typedef struct {
-    Id id;
-    Vector2 position;
-    Vector2 size;
-    Color color;
-} Rect;
 
 // NOTE: Don't rearrange order without modifying Umka enum
 typedef enum {
@@ -45,7 +38,8 @@ typedef enum {
 } ActionKind;
 
 typedef struct {
-    int kind;
+    Id id;
+    ActionKind kind;
     f64 delay;
 } Action;
 
@@ -71,6 +65,19 @@ typedef struct {
     f64 duration;
 } UmkaTask;
 
+typedef struct {
+    Id id;
+    DVector2 position;
+    DVector2 size;
+    Color color;
+} Rect;
+
+typedef struct {
+    Rect *items;
+    int count;
+    int capacity;
+} RectList;
+
 Vector2 from_dv2(DVector2 dv)
 {
     return (Vector2){
@@ -79,7 +86,8 @@ Vector2 from_dv2(DVector2 dv)
     };
 }
 
-Arena arena = {0};
+static Arena arena = {0};
+const Id MAX_TASK_COUNT = 10;
 
 void print_err(void *umka)
 {
@@ -136,6 +144,7 @@ bool get_tasks(void *umka, TaskList *tasks)
 
         for (int i = 0; i < umkaGetDynArrayLen(&ut.actions); i++) {
             Action a = {
+                .id = ut.actions.data[i].id,
                 .kind = ut.actions.data[i].kind,
                 .delay = ut.actions.data[i].delay,
             };
@@ -158,53 +167,52 @@ void print_tasks(TaskList tl)
         printf("    duration = %f\n", t.duration);
         for (int k = 0; k < t.actions.count; k++) {
             Action a = t.actions.items[k];
-            printf("    [%2d] {kind = %d, delay = %f}\n", k, a.kind, a.delay);
+            printf("    [%2d] {id = %d, kind = %d, delay = %f}\n", k, a.id, a.kind, a.delay);
         }
         printf("}\n");
     }
 }
 
 static Id _id_ = 0;
-static Rect rect = {0};
+static RectList rl = {0};
 void __newRect(UmkaStackSlot *p, UmkaStackSlot *r)
 {
     DVector2 pos = *(DVector2 *)umkaGetParam(p, 0);
     DVector2 size = *(DVector2 *)umkaGetParam(p, 1);
     Color color = *(Color *)umkaGetParam(p, 2);
 
-    rect = (Rect){
+    Rect rect = {
         .id = _id_,
-        .position = from_dv2(pos),
-        .size = from_dv2(size),
+        .position = pos,
+        .size = size,
         .color = color,
     };
-    _id_++;
     *(Rect *)umkaGetResult(p, r)->ptrVal = rect;
+
+    arena_da_append(&arena, &rl, rect);
+    _id_++;
 }
 
 bool content_w_preamble(Arena *arena, const char *filename, char **content)
 {
     char preamble[1024] = {0};
-    const Id MAX_TASK_COUNT = 5;
 
     snprintf(preamble, 1024,
-             "type Vec2 = struct { x, y: real };\n"
-             "type Color = struct { r, g, b, a: uint8 };\n"
-             "type Id = uint16;\n"
-             "type Rect = struct { id: Id; pos, size: Vec2; color: Color };\n"
-             "type ActionKind = enum (int32) { Sleep; FadeIn; FadeOut; };\n"
-             "type Action = struct { kind: ActionKind; delay: real };\n"
-             "type Task = struct { actions: []Action; duration: real }\n\n"
+        "type Vec2 = struct { x, y: real };\n"
+        "type Color = struct { r, g, b, a: uint8 };\n"
+        "type Id = int16;\n"
+        "type Rect = struct { id: Id; pos, size: Vec2; color: Color };\n"
+        "type ActionKind = enum (int32) { Sleep; FadeIn; FadeOut; };\n"
+        "type Action = struct { id: Id; kind: ActionKind; delay: real };\n"
+        "type Task = struct { actions: []Action; duration: real }\n\n"
 
-             "const MAX_TASK_COUNT = Id(%d);\n"
-             "task_count := uint16(0);\n"
-             "var ALL_TASKS: [MAX_TASK_COUNT]Task;\n\n"
+        "const MAX_TASK_COUNT = Id(%d);\n"
+        "task_count := uint16(0);\n"
+        "var ALL_TASKS: [MAX_TASK_COUNT]Task;\n\n"
 
-             "fn newRect(\n"
-             "    pos: Vec2 = Vec2{0, 0}, size: Vec2 = Vec2{1, 1},\n"
-             "    color: Color = Color{255, 255, 255, 255}"
-             "): Rect\n",
-             MAX_TASK_COUNT);
+        "fn newRect(pos: Vec2 = Vec2{0, 0}, size: Vec2 = Vec2{1, 1}, color: Color = Color{255, 255, 255, 255}): Rect\n",
+        MAX_TASK_COUNT
+    );
 
     FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
@@ -221,6 +229,7 @@ bool content_w_preamble(Arena *arena, const char *filename, char **content)
 
     char *file_content = arena_alloc(arena, fsz + 1);
     fread(file_content, fsz, 1, fp);
+    file_content[fsz] = '\0';
 
     *content = arena_sprintf(arena, "%s\n%s", preamble, file_content);
     return true;
@@ -255,8 +264,8 @@ int main(void)
 
     TaskList tl = {0};
     get_tasks(umka, &tl);
-    printf("[INFO] Found %d tasks\n", tl.count);
     print_tasks(tl);
+    printf("[INFO] Found %d tasks\n", tl.count);
     int current = 0;
     bool paused = false;
     bool first = true;
@@ -273,7 +282,11 @@ int main(void)
         .rotation = 0.0f,
         .zoom = 1.0f,
     };
-    Color start = rect.color;
+    Color start[2] = {0};
+    for (int i = 0; i < rl.count; i++) {
+        rl.items[i].color = ColorAlpha(rl.items[i].color, 0.0);
+        start[i] = rl.items[i].color;
+    }
 
     while (!WindowShouldClose()) {
         if (!paused) {
@@ -282,31 +295,32 @@ int main(void)
             if (current < tl.count) {
                 Task task = tl.items[current];
                 if (first) {
-                    start = ColorAlpha(start, 1.0f);
+                    for (int i = 0; i < rl.count; i++) {
+                        start[i] = ColorAlpha(rl.items[i].color, 1.0f);
+                    }
                     first = false;
                 }
 
-                if (t <= task.duration + dt) {
+                if (t <= task.duration) {
                     ActionList al = task.actions;
                     for (int i = 0; i < al.count; i++) {
                         Action a = al.items[i];
+
                         switch (a.kind) {
-                            case AK_Sleep:
-                                printf("sleep: t = %f\n", t);
-                                break;
+                            case AK_Sleep: break;
 
                             case AK_FadeIn:
-                                rect.color = ColorLerp(
-                                    ColorAlpha(start, 0.0f),
-                                    ColorAlpha(start, 1.0f),
+                                rl.items[a.id].color = ColorLerp(
+                                    ColorAlpha(start[a.id], 0.0f),
+                                    ColorAlpha(start[a.id], 1.0f),
                                     t / task.duration
                                 );
                                 break;
 
                             case AK_FadeOut:
-                                rect.color = ColorLerp(
-                                    ColorAlpha(start, 1.0f),
-                                    ColorAlpha(start, 0.0f),
+                                rl.items[a.id].color = ColorLerp(
+                                    ColorAlpha(start[a.id], 1.0f),
+                                    ColorAlpha(start[a.id], 0.0f),
                                     t / task.duration
                                 );
                                 break;
@@ -320,8 +334,8 @@ int main(void)
                     t += dt;
                 } else {
                     if (!first) first = true;
+                    current++;
                     if (current < tl.count) {
-                        current++;
                         t = 0.0f;
                         printf("current task[%d]...\n", current);
                     } else {
@@ -336,10 +350,13 @@ int main(void)
         ClearBackground(BLACK);
 
         BeginMode2D(cam);
-        Vector2 pos = Vector2Scale(rect.position, UNIT_TO_PX);
-        Vector2 size = Vector2Scale(rect.size, UNIT_TO_PX);
-        pos = Vector2Subtract(pos, Vector2Scale(size, 0.5));
-        DrawRectangleV(pos, size, rect.color);
+        for (int i = 0; i < rl.count; i++) {
+            Rect r = rl.items[i];
+            Vector2 pos = Vector2Scale(from_dv2(r.position), UNIT_TO_PX);
+            Vector2 size = Vector2Scale(from_dv2(r.size), UNIT_TO_PX);
+            pos = Vector2Subtract(pos, Vector2Scale(size, 0.5));
+            DrawRectangleV(pos, size, r.color);
+        }
 
         Vector2 txt_pos = GetScreenToWorld2D((Vector2){10, 10}, cam);
         DrawFPS((int)txt_pos.x, (int)txt_pos.y);
@@ -352,4 +369,6 @@ int main(void)
     CloseWindow();
     umkaFree(umka);
     arena_free(&arena);
+
+    return 0;
 }

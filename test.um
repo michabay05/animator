@@ -1,19 +1,49 @@
-import "t.um"
-
-fn compute_area(a, b: real32): real32 {
-    printf("a = %v\n", a);
-    printf("b = %v\n", b);
-    return a*b;
+fn fade_in*(id: Id, delay: real = 0.0): Action {
+    return Action{ ActionKind.FadeIn, delay };
 }
 
-fn vec2_add(a, b: t::vec2): t::vec2 {
-    printf("a = %v\n", a);
-    printf("b = %v\n", b);
-	printf("v = %v\n", t::vec2{a.x+b.x, a.y+b.y});
-	return t::vec2{a.x+b.x, a.y+b.y};
+fn fade_out*(id: Id, delay: real = 0.0): Action {
+    return Action{ ActionKind.FadeOut, delay };
 }
 
-fn color_disappear(a: t::color): t::color {
-    a.a = 0;
-    return a;
+fn sleep*(delay: real = 0.0): Action {
+    return Action{ ActionKind.Sleep, delay };
+}
+
+fn play*(actions: []Action, duration: real = 1.0): void {
+    for _, act in actions {
+        if act.delay >= duration {
+            printf("[WARN] The act below has delay greater than the task duration...\n");
+            printf("[WARN] (Duration: %v) vs %v\n", duration, act);
+        }
+    }
+
+    if task_count < MAX_TASK_COUNT {
+        ALL_TASKS[task_count] = Task{ actions, duration };
+        task_count++;
+    } else {
+        printf("[WARN] Can't append any more tasks: going beyond max limit...\n");
+    }
+}
+
+fn get_task_count(): int {
+    return task_count;
+}
+
+fn get_tasks(): [MAX_TASK_COUNT]Task {
+    return ALL_TASKS;
+}
+
+
+fn sequence(): void {
+    r1 := newRect();
+
+    play({fade_in(r1.id, 0.1)});
+    play({sleep(1.0)}, 3.1415);
+    play({fade_out(r1.id)});
+    play({sleep(1.0)}, 3.1415);
+}
+
+fn main(): void {
+    sequence();
 }

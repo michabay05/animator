@@ -12,6 +12,9 @@ fn sequence(): void {
     wait();
     play(3);
 
+    move(r1, Vec2{-4, -4});
+    play();
+
     fade_out(r1);
     fade_out(r2);
     play();

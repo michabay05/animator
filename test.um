@@ -2,8 +2,6 @@ fn sequence(): void {
     white := Color{255, 255, 255, 255};
     r1 := new_rect(Vec2{0,0}, Vec2{1,1}, white);
     r2 := new_rect(Vec2{2,2}, Vec2{1,1}, white);
-    printf("%v\n", r1);
-    printf("%v\n", r2);
 
     fade_in(r1);
     fade_in(r2);
@@ -13,9 +11,5 @@ fn sequence(): void {
     play(3);
 
     move(r1, Vec2{-4, -4});
-    play();
-
-    fade_out(r1);
-    fade_out(r2);
     play();
 }

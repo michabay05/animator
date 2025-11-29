@@ -68,9 +68,9 @@ typedef struct {
 SP_STRUCT_ARR(ActionList, Action);
 
 typedef struct {
-    UmkaDynArray(Action) actions;
-    f64 duration;
-} UmkaTask;
+    const char *name;
+    UmkaExternFunc func;
+} UmkaFunc;
 
 typedef struct {
     ActionList actions;
@@ -104,25 +104,52 @@ typedef enum {
 } EaseMode;
 
 typedef struct {
+    // NOTE: this object list contains the original, unmodified state of the objects
+    ObjList orig_objs;
     ObjList objs;
-    ObjList sim_objs;
+
     TaskList tasks;
     Id id_counter;
     EaseMode easing;
+
+    int preamble_lines;
+    int current;
+    f32 t;
+    bool paused, quit;
+    int width;
+    int height;
 } Context;
 
 #define UNIT_TO_PX 50
-extern Arena arena;
-extern Id _id_;
+#define SCENE_OBJ ((Id)-1)
 
+extern Arena arena;
+extern Context ctx;
+
+Id spc_next_id(void);
+void spc_print_tasks(TaskList tl);
+void spc_new_task(f64 duration);
+void spc_add_action(Action action);
+bool spc_get_obj(Id id, Obj **obj);
+void spc_reset_objs(void);
+Obj spo_rect(DVector2 pos, DVector2 size, Color color);
+void spo_get_pos(Obj *obj, DVector2 **pos);
+void spo_get_color(Obj *obj, Color **color);
+void spo_render(Obj obj);
+Action spo_enable(Id obj_id);
+void spu_run_sequence(void *umka);
 void spu_print_err(void *umka);
 bool spu_call_fn(void *umka, const char *fn_name, UmkaStackSlot **slot, size_t storage_bytes);
-bool spu_get_tasks(void *umka, TaskList *tasks);
-void sp_print_tasks(TaskList tl);
+bool spu_content_w_preamble(Arena *arena, const char *filename, char **content);
 void spu_new_rect(UmkaStackSlot *p, UmkaStackSlot *r);
-bool spu_content_preamble(Arena *arena, const char *filename, char **content);
+void spu_fade_in(UmkaStackSlot *p, UmkaStackSlot *r);
+void spu_fade_out(UmkaStackSlot *p, UmkaStackSlot *r);
+void spu_move(UmkaStackSlot *p, UmkaStackSlot *r);
+void spu_wait(UmkaStackSlot *p, UmkaStackSlot *r);
+void spu_play(UmkaStackSlot *p, UmkaStackSlot *r);
+void spa_interp(Action action, void **value, f32 factor);
+f32 sp_easing(f32 t, f32 duration);
 Vector2 sp_from_dv2(DVector2 dv);
-DVector2 sp_to_dv2(Vector2 dv);
-void spu_run_sequence(void *umka);
+DVector2 sp_to_dv2(Vector2 v);
 
 #endif // _SPAN_H_

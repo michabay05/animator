@@ -43,6 +43,7 @@ typedef enum {
     AK_Enable,
     AK_Wait,
     AK_Fade,
+    AK_Move,
 } ActionKind;
 
 typedef struct {
@@ -51,11 +52,17 @@ typedef struct {
 } FadeData;
 
 typedef struct {
+    DVector2 start;
+    DVector2 end;
+} MoveData;
+
+typedef struct {
     Id obj_id;
     ActionKind kind;
     f64 delay;
     union {
         FadeData fade;
+        MoveData move;
     } args;
 } Action;
 SP_STRUCT_ARR(ActionList, Action);
@@ -91,10 +98,17 @@ typedef struct {
 } Obj;
 SP_STRUCT_ARR(ObjList, Obj);
 
+typedef enum {
+    EM_Linear,
+    EM_Sine,
+} EaseMode;
+
 typedef struct {
     ObjList objs;
+    ObjList sim_objs;
     TaskList tasks;
     Id id_counter;
+    EaseMode easing;
 } Context;
 
 #define UNIT_TO_PX 50
@@ -108,6 +122,7 @@ void sp_print_tasks(TaskList tl);
 void spu_new_rect(UmkaStackSlot *p, UmkaStackSlot *r);
 bool spu_content_preamble(Arena *arena, const char *filename, char **content);
 Vector2 sp_from_dv2(DVector2 dv);
+DVector2 sp_to_dv2(Vector2 dv);
 void spu_run_sequence(void *umka);
 
 #endif // _SPAN_H_

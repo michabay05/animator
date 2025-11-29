@@ -133,3 +133,11 @@ Vector2 sp_from_dv2(DVector2 dv)
         .y = (f32)dv.y,
     };
 }
+
+DVector2 sp_to_dv2(Vector2 v)
+{
+    return (DVector2){
+        .x = (f64)v.x,
+        .y = (f64)v.y,
+    };
+}

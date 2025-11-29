@@ -1,5 +1,6 @@
 #include "raylib.h"
 #include "umka_api.h"
+#include <math.h>
 #include <stdio.h>
 
 #define ARENA_IMPLEMENTATION
@@ -42,6 +43,16 @@ void spc_add_action(Action action)
     arena_da_append(&arena, &last->actions, action);
 }
 
+bool spc_get_sim_obj(Id id, Obj **obj)
+{
+    if (id < ctx.objs.count) {
+        *obj = &ctx.sim_objs.items[id];
+        return true;
+    } else {
+        return false;
+    }
+}
+
 bool spc_get_obj(Id id, Obj **obj)
 {
     if (id < ctx.objs.count) {
@@ -66,6 +77,19 @@ Obj spo_rect(DVector2 pos, DVector2 size, Color color)
             }
         }
     };
+}
+
+void spo_get_pos(Obj *obj, DVector2 **pos)
+{
+    switch (obj->kind) {
+        case OK_RECT: {
+            *pos = &obj->as.rect.position;
+        } break;
+
+        default: {
+            SP_UNREACHABLEF("Unknown kind of object: %d", obj->kind);
+        } break;
+    }
 }
 
 void spo_get_color(Obj *obj, Color **color)
@@ -120,6 +144,7 @@ void spu_new_rect(UmkaStackSlot *p, UmkaStackSlot *r)
     umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
 
     arena_da_append(&arena, &ctx.objs, rect);
+    arena_da_append(&arena, &ctx.sim_objs, rect);
 }
 
 void spu_fade_in(UmkaStackSlot *p, UmkaStackSlot *r)
@@ -131,7 +156,7 @@ void spu_fade_in(UmkaStackSlot *p, UmkaStackSlot *r)
 
     Obj *obj = NULL;
     Color *current = NULL;
-    SP_ASSERT(spc_get_obj(obj_id, &obj));
+    SP_ASSERT(spc_get_sim_obj(obj_id, &obj));
     spo_get_color(obj, &current);
 
     FadeData fade = {
@@ -165,7 +190,7 @@ void spu_fade_out(UmkaStackSlot *p, UmkaStackSlot *r)
 
     Obj *obj = NULL;
     Color *current = NULL;
-    SP_ASSERT(spc_get_obj(obj_id, &obj));
+    SP_ASSERT(spc_get_sim_obj(obj_id, &obj));
     spo_get_color(obj, &current);
 
     FadeData fade = {
@@ -203,6 +228,41 @@ void spu_wait(UmkaStackSlot *p, UmkaStackSlot *r)
     spc_add_action(action);
 }
 
+void spu_move(UmkaStackSlot *p, UmkaStackSlot *r)
+{
+    SP_UNUSED(r);
+
+    Id obj_id = *(Id *)umkaGetParam(p, 0);
+    DVector2 pos = *(DVector2 *)umkaGetParam(p, 1);
+    f64 delay = *(f64 *)umkaGetParam(p, 2);
+
+    Obj *obj = NULL;
+    DVector2 *current = NULL;
+    SP_ASSERT(spc_get_sim_obj(obj_id, &obj));
+    spo_get_pos(obj, &current);
+
+    MoveData move = {
+        .start = *current,
+        .end = pos,
+    };
+
+    Action action = {
+        .obj_id = obj_id,
+        .delay = delay,
+        .kind = AK_Move,
+        .args = {.move = move},
+    };
+
+    if (!obj->enabled) {
+        // It need to be enabled first to be rendered on the screen.
+        spc_add_action(spo_enable(obj_id));
+    }
+    spc_add_action(action);
+
+    // Update the obj's prop
+    *current = move.end;
+}
+
 void spu_play(UmkaStackSlot *p, UmkaStackSlot *r)
 {
     SP_UNUSED(r);
@@ -211,6 +271,10 @@ void spu_play(UmkaStackSlot *p, UmkaStackSlot *r)
     Task *last = &ctx.tasks.items[ctx.tasks.count - 1];
     last->duration = duration;
 
+    // NOTE: the line below is just a hack for now. a new task should only be added
+    // when a new action is added. the line below just preemptively adds a task, which
+    // is good but should not be done here.
+    // TODO: remove this
     spc_new_task(0.0);
 }
 
@@ -226,9 +290,31 @@ void spa_interp(Action action, void **value, f32 factor)
             *c = ColorLerp(args.start, args.end, factor);
         } break;
 
+        case AK_Move: {
+            DVector2 *v = *(DVector2**)value;
+            MoveData args = action.args.move;
+            *v = sp_to_dv2(
+                Vector2Lerp(sp_from_dv2(args.start), sp_from_dv2(args.end), factor)
+            );
+        } break;
+
         default: {
             SP_UNREACHABLEF("Unknown kind of action: %d", action.kind);
         } break;
+    }
+}
+
+f32 easing(f32 t, f32 duration)
+{
+    switch (ctx.easing) {
+        case EM_Linear:
+            return t / duration;
+
+        case EM_Sine:
+            return -0.5*cosf(PI / duration * t) + 0.5;
+
+        default:
+            SP_UNREACHABLEF("Unknown mode of easing: %d", ctx.easing);
     }
 }
 
@@ -251,6 +337,7 @@ int main(void)
         (UmkaFunc){.name = "new_rect", .func = &spu_new_rect},
         (UmkaFunc){.name = "fade_in", .func = &spu_fade_in},
         (UmkaFunc){.name = "fade_out", .func = &spu_fade_out},
+        (UmkaFunc){.name = "move", .func = &spu_move},
         (UmkaFunc){.name = "wait", .func = &spu_wait},
         (UmkaFunc){.name = "play", .func = &spu_play},
     };
@@ -278,6 +365,7 @@ int main(void)
     SetTargetFPS(60);
 
     printf("ctx.tasks.count = %d\n", ctx.tasks.count);
+    ctx.easing = EM_Sine;
 
     Vector2 dimension = {(f32)GetScreenWidth(), (f32)GetScreenHeight()};
     Camera2D cam = {
@@ -294,6 +382,7 @@ int main(void)
 
             if (current < ctx.tasks.count) {
                 Task task = ctx.tasks.items[current];
+                float factor = easing(t, task.duration);
 
                 if (t <= task.duration) {
                     ActionList al = task.actions;
@@ -310,6 +399,17 @@ int main(void)
                             case AK_Wait: {
                             } break;
 
+                            case AK_Move: {
+                                Obj *obj = {0};
+                                DVector2 *pos = NULL;
+                                SP_ASSERT(spc_get_obj(a.obj_id, &obj));
+                                SP_ASSERT(obj->enabled);
+                                spo_get_pos(obj, &pos);
+                                SP_ASSERT(pos != NULL);
+
+                                spa_interp(a, (void*)&pos, factor);
+                            } break;
+
                             case AK_Fade: {
                                 Obj *obj = {0};
                                 Color *color = NULL;
@@ -318,7 +418,7 @@ int main(void)
                                 spo_get_color(obj, &color);
                                 SP_ASSERT(color != NULL);
 
-                                spa_interp(a, (void*)&color, t / task.duration);
+                                spa_interp(a, (void*)&color, factor);
                             } break;
 
                             default: {

@@ -2,3 +2,4 @@
 /.vscode/
 /obj/
 /compile_commads.json
+/*.bin

@@ -1,54 +1,18 @@
-fn fade_in(id: Id, delay: real = 0.0): Action {
-    return Action{ id, ActionKind.FadeIn, delay };
-}
-
-fn fade_out(id: Id, delay: real = 0.0): Action {
-    return Action{ id, ActionKind.FadeOut, delay };
-}
-
-fn sleep(delay: real = 0.0): Action {
-    return Action{ -1, ActionKind.Sleep, delay };
-}
-
-fn play*(actions: []Action, duration: real = 1.0): void {
-    for _, act in actions {
-        if act.delay >= duration {
-            printf("[WARN] The act below has delay greater than the task duration...\n");
-            printf("[WARN] (Duration: %v) vs %v\n", duration, act);
-        }
-    }
-
-    if task_count < MAX_TASK_COUNT {
-        ALL_TASKS[task_count] = Task{ actions, duration };
-        task_count++;
-    } else {
-        printf("[WARN] Can't append any more tasks: going beyond max limit...\n");
-    }
-}
-
-fn get_task_count(): int {
-    return task_count;
-}
-
-fn get_tasks(): [MAX_TASK_COUNT]Task {
-    return ALL_TASKS;
-}
-
-
 fn sequence(): void {
     white := Color{255, 255, 255, 255};
-    r1 := newRect(Vec2{0,0}, Vec2{1,1}, white);
-    r2 := newRect(Vec2{2,2}, Vec2{1,1}, white);
+    r1 := new_rect(Vec2{0,0}, Vec2{1,1}, white);
+    r2 := new_rect(Vec2{2,2}, Vec2{1,1}, white);
     printf("%v\n", r1);
     printf("%v\n", r2);
 
-    play({fade_in(r1.id, 0.1)});
-    play({sleep(1.0)}, 2);
-    play({fade_in(r2.id)});
-    play({sleep(1.0)}, 2);
-    play({fade_out(r1.id, 0.1), fade_out(r2.id, 0.1)});
-}
+    fade_in(r1);
+    fade_in(r2);
+    play();
 
-fn main(): void {
-    sequence();
+    wait();
+    play(3);
+
+    fade_out(r1);
+    fade_out(r2);
+    play();
 }

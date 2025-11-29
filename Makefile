@@ -1,7 +1,7 @@
 SRCDIR = src
 VENDORDIR = vendor
 OBJDIR = obj
-BINARY = pa
+BINARY = span.bin
 VENDOR_INCDIR = $(VENDORDIR)/include
 VENDOR_LIBDIR = $(VENDORDIR)/lib
 
@@ -11,7 +11,7 @@ COMPFLAGS = -ggdb
 LDFLAGS = -L$(VENDOR_LIBDIR) -l:libraylib.a -l:libumka.a -lm
 
 # SOURCES = $(wildcard $(SRCDIR)/*.c)
-SOURCES = $(SRCDIR)/ffmpeg_linux.c $(SRCDIR)/main.c
+SOURCES = $(SRCDIR)/span.c $(SRCDIR)/ffmpeg_linux.c $(SRCDIR)/main.c
 OBJECTS = $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SOURCES))
 
 .PHONY: all clean compile

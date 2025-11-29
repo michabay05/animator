@@ -1,0 +1,7 @@
+# span
+
+## Quickstart
+```
+$ make
+$ ./span
+```

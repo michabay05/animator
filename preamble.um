@@ -1,0 +1,12 @@
+type Vec2* = struct { x, y: real };
+type Color* = struct { r, g, b, a: uint8 };
+type Id* = int16;
+
+fn new_rect*(
+    pos: Vec2 = Vec2{0, 0}, size: Vec2 = Vec2{1, 1},
+    color: Color = Color{255, 255, 255, 255}): Id;
+
+fn fade_in*(obj: Id, delay: real = 0.0): void;
+fn fade_out*(obj: Id, delay: real = 0.0): void;
+fn wait*(): void;
+fn play*(duration: real = 1.0): void;

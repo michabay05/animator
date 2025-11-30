@@ -85,8 +85,17 @@ typedef struct {
     Color color;
 } Rect;
 
+typedef struct {
+    Id id;
+    const char *str;
+    DVector2 position;
+    f32 font_size;
+    Color color;
+} Text;
+
 typedef enum {
     OK_RECT,
+    OK_TEXT,
 } ObjKind;
 
 typedef struct {
@@ -94,6 +103,7 @@ typedef struct {
     bool enabled;
     union {
         Rect rect;
+        Text text;
     } as;
 } Obj;
 SP_STRUCT_ARR(ObjList, Obj);
@@ -140,8 +150,9 @@ Action spo_enable(Id obj_id);
 void spu_run_sequence(void *umka);
 void spu_print_err(void *umka);
 bool spu_call_fn(void *umka, const char *fn_name, UmkaStackSlot **slot, size_t storage_bytes);
-bool spu_content_w_preamble(Arena *arena, const char *filename, char **content);
-void spu_new_rect(UmkaStackSlot *p, UmkaStackSlot *r);
+bool spu_content_w_preamble(const char *filename, char **content);
+void spuo_rect(UmkaStackSlot *p, UmkaStackSlot *r);
+void spuo_text(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_fade_in(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_fade_out(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_move(UmkaStackSlot *p, UmkaStackSlot *r);

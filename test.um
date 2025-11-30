@@ -1,15 +1,20 @@
 fn sequence(): void {
     white := Color{255, 255, 255, 255};
-    r1 := new_rect(Vec2{0,0}, Vec2{1,1}, white);
-    r2 := new_rect(Vec2{2,2}, Vec2{1,1}, white);
+    r := rect(Vec2{0,0}, Vec2{1,1}, white);
+    t := text("What is good bois?", Vec2{2,2}, 30, white);
 
-    fade_in(r1);
-    fade_in(r2);
+    fade_in(r);
+    fade_in(t);
     play();
 
     wait();
     play(3);
 
-    move(r1, Vec2{-4, -4});
+    move(r, Vec2{-4, -4});
+    move(t, Vec2{4, 4});
+    play();
+
+    fade_out(r);
+    fade_out(t);
     play();
 }

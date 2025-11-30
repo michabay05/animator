@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "span.h"
+#include "raylib.h"
 #include "raymath.h"
 
 Arena arena = {0};
@@ -77,11 +78,32 @@ Obj spo_rect(DVector2 pos, DVector2 size, Color color)
     };
 }
 
+Obj spo_text(const char *str, DVector2 pos, f32 font_size, Color color)
+{
+    return (Obj) {
+        .kind = OK_TEXT,
+        .enabled = false,
+        .as = {
+            .text = {
+                .id = spc_next_id(),
+                .str = arena_strdup(&arena, str),
+                .position = pos,
+                .font_size = font_size,
+                .color = color,
+            }
+        }
+    };
+}
+
 void spo_get_pos(Obj *obj, DVector2 **pos)
 {
     switch (obj->kind) {
         case OK_RECT: {
             *pos = &obj->as.rect.position;
+        } break;
+
+        case OK_TEXT: {
+            *pos = &obj->as.text.position;
         } break;
 
         default: {
@@ -95,6 +117,10 @@ void spo_get_color(Obj *obj, Color **color)
     switch (obj->kind) {
         case OK_RECT: {
             *color = &obj->as.rect.color;
+        } break;
+
+        case OK_TEXT: {
+            *color = &obj->as.text.color;
         } break;
 
         default: {
@@ -114,6 +140,18 @@ void spo_render(Obj obj)
             Vector2 size = Vector2Scale(sp_from_dv2(r.size), UNIT_TO_PX);
             pos = Vector2Subtract(pos, Vector2Scale(size, 0.5));
             DrawRectangleV(pos, size, r.color);
+        } break;
+
+        case OK_TEXT: {
+            Text t = obj.as.text;
+            Font font = GetFontDefault();
+            f32 spacing = 2.0f;
+
+            Vector2 pos = Vector2Scale(sp_from_dv2(t.position), UNIT_TO_PX);
+            f32 font_size = t.font_size;
+            Vector2 text_dim = MeasureTextEx(font, t.str, font_size, spacing);
+            pos = Vector2Subtract(pos, Vector2Scale(text_dim, 0.5));
+            DrawTextEx(font, t.str, pos, font_size, spacing, t.color);
         } break;
 
         default: {
@@ -149,7 +187,12 @@ static void spu__preamble_count_lines(const char *preamble)
 void spu_print_err(void *umka)
 {
     UmkaError *err = umkaGetError(umka);
-    printf("%s:%d:%d: %s\n", err->fnName, err->line - ctx.preamble_lines, err->pos, err->msg);
+    if (err->line <= ctx.preamble_lines) {
+        printf("preamble:%d:%d: %s\n", err->line, err->pos, err->msg);
+    } else {
+        int line_no = err->line - ctx.preamble_lines;
+        printf("%s:%d:%d: %s\n", err->fnName, line_no, err->pos, err->msg);
+    }
 }
 
 bool spu_call_fn(void *umka, const char *fn_name, UmkaStackSlot **slot, size_t storage_bytes)
@@ -177,7 +220,7 @@ bool spu_call_fn(void *umka, const char *fn_name, UmkaStackSlot **slot, size_t s
     return true;
 }
 
-bool spu_content_w_preamble(Arena *arena, const char *filename, char **content)
+bool spu_content_w_preamble(const char *filename, char **content)
 {
     char preamble[2*1024] = {0};
 
@@ -206,22 +249,36 @@ bool spu_content_w_preamble(Arena *arena, const char *filename, char **content)
     fsz = ftell(fp);
     rewind(fp);
 
-    char *file_content = arena_alloc(arena, fsz + 1);
+    char *file_content = arena_alloc(&arena, fsz + 1);
     fread(file_content, fsz, 1, fp);
     file_content[fsz] = '\0';
     fclose(fp);
 
-    *content = arena_sprintf(arena, "%s\n%s", preamble, file_content);
+    *content = arena_sprintf(&arena, "%s\n%s", preamble, file_content);
     return true;
 }
 
-void spu_new_rect(UmkaStackSlot *p, UmkaStackSlot *r)
+void spuo_rect(UmkaStackSlot *p, UmkaStackSlot *r)
 {
     DVector2 pos = *(DVector2 *)umkaGetParam(p, 0);
     DVector2 size = *(DVector2 *)umkaGetParam(p, 1);
     Color color = *(Color *)umkaGetParam(p, 2);
 
     Obj rect = spo_rect(pos, size, color);
+    umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
+
+    arena_da_append(&arena, &ctx.objs, rect);
+    arena_da_append(&arena, &ctx.orig_objs, rect);
+}
+
+void spuo_text(UmkaStackSlot *p, UmkaStackSlot *r)
+{
+    const unsigned char *text = (const unsigned char *)(umkaGetParam(p, 0)->ptrVal);
+    DVector2 pos = *(DVector2 *)umkaGetParam(p, 1);
+    f32 font_size = *(f32 *)umkaGetParam(p, 2);
+    Color color = *(Color *)umkaGetParam(p, 3);
+
+    Obj rect = spo_text((const char *)text, pos, font_size, color);
     umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
 
     arena_da_append(&arena, &ctx.objs, rect);
@@ -361,8 +418,7 @@ void spu_play(UmkaStackSlot *p, UmkaStackSlot *r)
 
 void spa_interp(Action action, void **value, f32 factor)
 {
-    if (factor < 0.0f) factor = 0.0;
-    if (factor > 1.0f) factor = 1.0;
+    factor = Clamp(factor, 0.0f, 1.0f);
 
     switch (action.kind) {
         case AK_Fade: {
@@ -398,6 +454,7 @@ f32 sp_easing(f32 t, f32 duration)
             SP_UNREACHABLEF("Unknown mode of easing: %d", ctx.easing);
     }
 }
+
 Vector2 sp_from_dv2(DVector2 dv)
 {
     return (Vector2){

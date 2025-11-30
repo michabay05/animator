@@ -8,14 +8,18 @@
 #include "raymath.h"
 
 // TODO:
-//   - [ ] Improve error file line number by subtracting the # of lines in the
-//   preamble
 //   - [ ] Handle delay for each action
 
 bool spc_init(const char *filename)
 {
+    ctx = (Context) {
+        .easing = EM_Sine,
+        .width = 800,
+        .height = 600
+    };
+
     char *content = NULL;
-    bool ok = spu_content_w_preamble(&arena, filename, &content);
+    bool ok = spu_content_w_preamble(filename, &content);
     if (!ok) {
         return false;
     }
@@ -28,7 +32,8 @@ bool spc_init(const char *filename)
     }
 
     UmkaFunc fns[] = {
-        (UmkaFunc){.name = "new_rect", .func = &spu_new_rect},
+        (UmkaFunc){.name = "rect", .func = &spuo_rect},
+        (UmkaFunc){.name = "text", .func = &spuo_text},
         (UmkaFunc){.name = "fade_in", .func = &spu_fade_in},
         (UmkaFunc){.name = "fade_out", .func = &spu_fade_out},
         (UmkaFunc){.name = "move", .func = &spu_move},
@@ -48,17 +53,10 @@ bool spc_init(const char *filename)
         spu_print_err(umka);
         return false;
     }
-
     spu_run_sequence(umka);
-
     umkaFree(umka);
 
     printf("ctx.tasks.count = %d\n", ctx.tasks.count);
-    ctx.paused = false;
-    ctx.t = 0.0f;
-    ctx.current = 0;
-    ctx.easing = EM_Sine;
-
     spc_reset_objs();
 
     return true;

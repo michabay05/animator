@@ -35,6 +35,10 @@ typedef double f64;
 typedef uint16_t Id;
 
 typedef struct {
+    int x, y;
+} IVector2;
+
+typedef struct {
     f64 x, y;
 } DVector2;
 
@@ -113,7 +117,14 @@ typedef enum {
     EM_Sine,
 } EaseMode;
 
+typedef enum {
+    RM_Preview,
+    RM_Output,
+} RenderMode;
+
 typedef struct {
+    void *umka;
+
     // NOTE: this object list contains the original, unmodified state of the objects
     ObjList orig_objs;
     ObjList objs;
@@ -126,8 +137,12 @@ typedef struct {
     int current;
     f32 t;
     bool paused, quit;
-    int width;
-    int height;
+
+    IVector2 res;
+    Camera2D cam;
+    int fps;
+    RenderMode render_mode;
+    RenderTexture rtex;
 } Context;
 
 #define UNIT_TO_PX 50
@@ -136,20 +151,27 @@ typedef struct {
 extern Arena arena;
 extern Context ctx;
 
+bool spc_init(const char *filename);
+bool spc_umka_init(const char *filename);
+void spc_renderer_init(void);
+void spc_deinit(void);
+void spc_update(f32 dt);
+void spc_render(void);
 Id spc_next_id(void);
 void spc_print_tasks(TaskList tl);
 void spc_new_task(f64 duration);
 void spc_add_action(Action action);
 bool spc_get_obj(Id id, Obj **obj);
-void spc_reset_objs(void);
+void spc_clear_tasks(void);
+void spc_reset(void);
 Obj spo_rect(DVector2 pos, DVector2 size, Color color);
 void spo_get_pos(Obj *obj, DVector2 **pos);
 void spo_get_color(Obj *obj, Color **color);
 void spo_render(Obj obj);
 Action spo_enable(Id obj_id);
-void spu_run_sequence(void *umka);
-void spu_print_err(void *umka);
-bool spu_call_fn(void *umka, const char *fn_name, UmkaStackSlot **slot, size_t storage_bytes);
+void spu_run_sequence(void);
+void spu_print_err(void);
+bool spu_call_fn(const char *fn_name, UmkaStackSlot **slot, size_t storage_bytes);
 bool spu_content_w_preamble(const char *filename, char **content);
 void spuo_rect(UmkaStackSlot *p, UmkaStackSlot *r);
 void spuo_text(UmkaStackSlot *p, UmkaStackSlot *r);
@@ -160,7 +182,8 @@ void spu_wait(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_play(UmkaStackSlot *p, UmkaStackSlot *r);
 void spa_interp(Action action, void **value, f32 factor);
 f32 sp_easing(f32 t, f32 duration);
-Vector2 sp_from_dv2(DVector2 dv);
-DVector2 sp_to_dv2(Vector2 v);
+Vector2 spv_dtof(DVector2 dv);
+DVector2 spv_ftod(Vector2 v);
+Vector2 spv_itof(IVector2 iv);
 
 #endif // _SPAN_H_

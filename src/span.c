@@ -8,6 +8,180 @@
 Arena arena = {0};
 Context ctx = {0};
 
+bool spc_init(const char *filename)
+{
+    ctx = (Context){0};
+    ctx.umka = NULL;
+    ctx.easing = EM_Sine;
+
+    bool ok = spc_umka_init(filename);
+    if (!ok) return false;
+
+    spc_renderer_init();
+    return true;
+}
+
+bool spc_umka_init(const char *filename)
+{
+    char *content = NULL;
+    bool ok = spu_content_w_preamble(filename, &content);
+    if (!ok) {
+        return false;
+    }
+
+    if (ctx.umka == NULL) {
+        ctx.umka = umkaAlloc();
+    }
+
+    ok = umkaInit(ctx.umka, NULL, content, 1024 * 1024, NULL, 0, NULL, false, false, NULL);
+    if (!ok) {
+        spu_print_err();
+        return false;
+    }
+
+    UmkaFunc fns[] = {
+        (UmkaFunc){.name = "rect", .func = &spuo_rect},
+        (UmkaFunc){.name = "text", .func = &spuo_text},
+        (UmkaFunc){.name = "fade_in", .func = &spu_fade_in},
+        (UmkaFunc){.name = "fade_out", .func = &spu_fade_out},
+        (UmkaFunc){.name = "move", .func = &spu_move},
+        (UmkaFunc){.name = "wait", .func = &spu_wait},
+        (UmkaFunc){.name = "play", .func = &spu_play},
+    };
+    for (int i = 0; i < SP_LEN(fns); i++) {
+        ok = umkaAddFunc(ctx.umka, fns[i].name, fns[i].func);
+        if (!ok) {
+            spu_print_err();
+            return false;
+        }
+    }
+
+    ok = umkaCompile(ctx.umka);
+    if (!ok) {
+        spu_print_err();
+        return false;
+    }
+    spu_run_sequence();
+    spc_reset();
+
+    printf("Loaded %d tasks.\n", ctx.tasks.count);
+    return true;
+}
+
+void spc_renderer_init(void)
+{
+    // Initialize renderer
+    ctx.render_mode = RM_Preview;
+
+    switch (ctx.render_mode) {
+        case RM_Preview: {
+            ctx.res = (IVector2){ 800, 600 };
+        } break;
+
+        case RM_Output: {
+            ctx.res = (IVector2){ 1280, 720 };
+        } break;
+
+        default: {
+            SP_UNREACHABLEF("Unknown render mode: %d", ctx.render_mode);
+        } break;
+    }
+
+    InitWindow(ctx.res.x, ctx.res.y, "span");
+
+    ctx.cam = (Camera2D) {
+        .offset = Vector2Scale(spv_itof(ctx.res), 0.5),
+        .target = Vector2Zero(),
+        .rotation = 0.0f,
+        .zoom = 1.0f,
+    };
+    ctx.fps = 60;
+    SetTargetFPS(ctx.fps);
+
+    ctx.rtex = LoadRenderTexture(ctx.res.x, ctx.res.y);
+}
+
+void spc_deinit(void)
+{
+    CloseWindow();
+    umkaFree(ctx.umka);
+    arena_free(&arena);
+}
+
+void spc_update(f32 dt)
+{
+    if (ctx.current < ctx.tasks.count) {
+        Task task = ctx.tasks.items[ctx.current];
+        float factor = sp_easing(ctx.t, task.duration);
+
+        if (ctx.t <= task.duration) {
+            ActionList al = task.actions;
+            for (int i = 0; i < al.count; i++) {
+                Action a = al.items[i];
+
+                switch (a.kind) {
+                    case AK_Enable: {
+                        Obj *obj = NULL;
+                        SP_ASSERT(spc_get_obj(a.obj_id, &obj));
+                        obj->enabled = true;
+                    } break;
+
+                    case AK_Wait: break;
+
+                    case AK_Move: {
+                        Obj *obj = {0};
+                        DVector2 *pos = NULL;
+                        SP_ASSERT(spc_get_obj(a.obj_id, &obj));
+                        SP_ASSERT(obj->enabled);
+                        spo_get_pos(obj, &pos);
+                        SP_ASSERT(pos != NULL);
+
+                        spa_interp(a, (void*)&pos, factor);
+                    } break;
+
+                    case AK_Fade: {
+                        Obj *obj = {0};
+                        Color *color = NULL;
+                        SP_ASSERT(spc_get_obj(a.obj_id, &obj));
+                        SP_ASSERT(obj->enabled);
+                        spo_get_color(obj, &color);
+                        SP_ASSERT(color != NULL);
+
+                        spa_interp(a, (void*)&color, factor);
+                    } break;
+
+                    default: {
+                        SP_UNREACHABLEF("Unknown kind: %d", a.kind);
+                    } break;
+                }
+            }
+
+            ctx.t += dt;
+        } else {
+            ctx.current++;
+            if (ctx.current < ctx.tasks.count) {
+                ctx.t = 0.0f;
+            } else {
+                ctx.paused = true;
+            }
+        }
+    }
+}
+
+void spc_render(void)
+{
+    ClearBackground(BLACK);
+
+    BeginMode2D(ctx.cam); {
+        for (int i = 0; i < ctx.objs.count; i++) {
+            Obj *obj = NULL;
+            SP_ASSERT(spc_get_obj(i, &obj));
+            spo_render(*obj);
+        }
+    } EndMode2D();
+}
+
+
 Id spc_next_id(void)
 {
     Id id = ctx.id_counter;
@@ -55,11 +229,24 @@ bool spc_get_obj(Id id, Obj **obj)
     }
 }
 
-void spc_reset_objs(void)
+void spc_reset(void)
 {
     for (int i = 0; i < ctx.objs.count; i++) {
         ctx.objs.items[i] = ctx.orig_objs.items[i];
     }
+    ctx.current = 0;
+    ctx.t = 0.0f;
+    ctx.paused = false;
+    ctx.quit = false;
+}
+
+// NOTE: Clear tasks does not mean clear the list and free the memory.
+void spc_clear_tasks(void)
+{
+    // NOTE (cont.): It just means that I will move the count variable
+    // to zero so as towrite new tasks over the old ones. The memory
+    // will cleaned up at the end.
+    ctx.tasks.count = 0;
 }
 
 Obj spo_rect(DVector2 pos, DVector2 size, Color color)
@@ -136,8 +323,8 @@ void spo_render(Obj obj)
     switch (obj.kind) {
         case OK_RECT: {
             Rect r = obj.as.rect;
-            Vector2 pos = Vector2Scale(sp_from_dv2(r.position), UNIT_TO_PX);
-            Vector2 size = Vector2Scale(sp_from_dv2(r.size), UNIT_TO_PX);
+            Vector2 pos = Vector2Scale(spv_dtof(r.position), UNIT_TO_PX);
+            Vector2 size = Vector2Scale(spv_dtof(r.size), UNIT_TO_PX);
             pos = Vector2Subtract(pos, Vector2Scale(size, 0.5));
             DrawRectangleV(pos, size, r.color);
         } break;
@@ -147,7 +334,7 @@ void spo_render(Obj obj)
             Font font = GetFontDefault();
             f32 spacing = 2.0f;
 
-            Vector2 pos = Vector2Scale(sp_from_dv2(t.position), UNIT_TO_PX);
+            Vector2 pos = Vector2Scale(spv_dtof(t.position), UNIT_TO_PX);
             f32 font_size = t.font_size;
             Vector2 text_dim = MeasureTextEx(font, t.str, font_size, spacing);
             pos = Vector2Subtract(pos, Vector2Scale(text_dim, 0.5));
@@ -170,9 +357,9 @@ Action spo_enable(Id obj_id)
     };
 }
 
-void spu_run_sequence(void *umka)
+void spu_run_sequence(void)
 {
-    spu_call_fn(umka, "sequence", NULL, 0);
+    spu_call_fn("sequence", NULL, 0);
 }
 
 static void spu__preamble_count_lines(const char *preamble)
@@ -184,9 +371,9 @@ static void spu__preamble_count_lines(const char *preamble)
     ctx.preamble_lines = count;
 }
 
-void spu_print_err(void *umka)
+void spu_print_err(void)
 {
-    UmkaError *err = umkaGetError(umka);
+    UmkaError *err = umkaGetError(ctx.umka);
     if (err->line <= ctx.preamble_lines) {
         printf("preamble:%d:%d: %s\n", err->line, err->pos, err->msg);
     } else {
@@ -195,10 +382,10 @@ void spu_print_err(void *umka)
     }
 }
 
-bool spu_call_fn(void *umka, const char *fn_name, UmkaStackSlot **slot, size_t storage_bytes)
+bool spu_call_fn(const char *fn_name, UmkaStackSlot **slot, size_t storage_bytes)
 {
     UmkaFuncContext fn = {0};
-    bool umkaOk = umkaGetFunc(umka, NULL, fn_name, &fn);
+    bool umkaOk = umkaGetFunc(ctx.umka, NULL, fn_name, &fn);
     if (!umkaOk)
         return false;
 
@@ -206,9 +393,9 @@ bool spu_call_fn(void *umka, const char *fn_name, UmkaStackSlot **slot, size_t s
         umkaGetResult(fn.params, fn.result)->ptrVal = arena_alloc(&arena, storage_bytes);
     }
 
-    umkaOk = umkaCall(umka, &fn) == 0;
+    umkaOk = umkaCall(ctx.umka, &fn) == 0;
     if (!umkaOk) {
-        spu_print_err(umka);
+        spu_print_err();
         return false;
     }
 
@@ -430,8 +617,8 @@ void spa_interp(Action action, void **value, f32 factor)
         case AK_Move: {
             DVector2 *v = *(DVector2**)value;
             MoveData args = action.args.move;
-            *v = sp_to_dv2(
-                Vector2Lerp(sp_from_dv2(args.start), sp_from_dv2(args.end), factor)
+            *v = spv_ftod(
+                Vector2Lerp(spv_dtof(args.start), spv_dtof(args.end), factor)
             );
         } break;
 
@@ -455,7 +642,7 @@ f32 sp_easing(f32 t, f32 duration)
     }
 }
 
-Vector2 sp_from_dv2(DVector2 dv)
+Vector2 spv_dtof(DVector2 dv)
 {
     return (Vector2){
         .x = (f32)dv.x,
@@ -463,10 +650,18 @@ Vector2 sp_from_dv2(DVector2 dv)
     };
 }
 
-DVector2 sp_to_dv2(Vector2 v)
+DVector2 spv_ftod(Vector2 v)
 {
     return (DVector2){
         .x = (f64)v.x,
         .y = (f64)v.y,
+    };
+}
+
+Vector2 spv_itof(IVector2 iv)
+{
+    return (Vector2){
+        .x = (f32)iv.x,
+        .y = (f32)iv.y,
     };
 }

@@ -1,7 +1,7 @@
 fn sequence(): void {
-    white := Color{255, 255, 255, 255};
-    r := rect(Vec2{0,0}, Vec2{1,1}, white);
-    t := text("What is good bois?", Vec2{2,2}, 30, white);
+    color := Color{155, 10, 255, 255};
+    r := rect(Vec2{0,0}, Vec2{1,1}, color);
+    t := text("What is good bois?", Vec2{2,2}, 30, color);
 
     fade_in(r);
     fade_in(t);

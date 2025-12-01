@@ -83,7 +83,12 @@ void spc_renderer_init(RenderMode mode)
         } break;
 
         case RM_Output: {
-            ctx.vres = (IVector2){ 3840, 2160 };
+            ctx.vres = (IVector2){ 1600, 1200 };
+            // NOTE: The aspect ratio of the preview window and video have to be the same.
+            f32 p_aspect_ratio = (f32)ctx.pres.x / (f32)ctx.pres.y;
+            f32 v_aspect_ratio = (f32)ctx.vres.x / (f32)ctx.vres.y;
+            SP_ASSERT(p_aspect_ratio == v_aspect_ratio);
+
             ctx.rtex = LoadRenderTexture(ctx.vres.x, ctx.vres.y);
             ctx.ffmpeg = ffmpeg_start_rendering_video(
                 "out.mp4", (size_t)ctx.vres.x, (size_t)ctx.vres.y, (size_t)ctx.fps);
@@ -383,6 +388,20 @@ void spo_get_color(Obj *obj, Color **color)
     }
 }
 
+// NOTE: This is only used for the font value for now
+static f32 spv__adjusted_value(f32 f)
+{
+    return (f / (f32)ctx.pres.y) * ctx.vres.y;
+}
+
+static Vector2 spv__adjusted_coords(Vector2 v)
+{
+    return Vector2Multiply(
+        Vector2Divide(v, spv_itof(ctx.pres)),
+        spv_itof(ctx.vres)
+    );
+}
+
 void spo_render(Obj obj)
 {
     if (!obj.enabled) return;
@@ -393,7 +412,11 @@ void spo_render(Obj obj)
             Vector2 pos = Vector2Scale(spv_dtof(r.position), UNIT_TO_PX);
             Vector2 size = Vector2Scale(spv_dtof(r.size), UNIT_TO_PX);
             pos = Vector2Subtract(pos, Vector2Scale(size, 0.5));
-            DrawRectangleV(pos, size, r.color);
+
+            DrawRectangleV(
+                spv__adjusted_coords(pos),
+                spv__adjusted_coords(size),
+                r.color);
         } break;
 
         case OK_TEXT: {
@@ -405,7 +428,13 @@ void spo_render(Obj obj)
             f32 font_size = t.font_size;
             Vector2 text_dim = MeasureTextEx(font, t.str, font_size, spacing);
             pos = Vector2Subtract(pos, Vector2Scale(text_dim, 0.5));
-            DrawTextEx(font, t.str, pos, font_size, spacing, t.color);
+
+            DrawTextEx(
+                font, t.str,
+                spv__adjusted_coords(pos),
+                spv__adjusted_value(font_size),
+                spv__adjusted_value(spacing),
+                t.color);
         } break;
 
         default: {

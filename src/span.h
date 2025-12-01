@@ -10,15 +10,15 @@
 #define SP_LEN(arr) ((int)(sizeof(arr) / sizeof(arr[0])))
 #define SP_ASSERT assert
 #define SP_UNUSED(x) ((void)x)
-#define SP_UNREACHABLE(message)                                                                    \
-    do {                                                                                           \
-        fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message);     \
-        abort();                                                                                   \
+#define SP_UNIMPLEMENTED(message)                                                                 \
+    do {                                                                                          \
+        fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message);                 \
+        abort();                                                                                  \
     } while (0)
-#define SP_UNREACHABLEF(message, ...)                                                              \
-    do {                                                                                           \
-        fprintf(stderr, "%s:%d: UNREACHABLE: " message "\n", __FILE__, __LINE__, __VA_ARGS__);     \
-        abort();                                                                                   \
+#define SP_UNREACHABLEF(message, ...)                                                             \
+    do {                                                                                          \
+        fprintf(stderr, "%s:%d: UNREACHABLE: " message "\n", __FILE__, __LINE__, __VA_ARGS__);    \
+        abort();                                                                                  \
     } while (0)
 
 #define SP_PRINT_V2(v) (printf("%s = (%f, %f)\n", #v, v.x, v.y))
@@ -86,6 +86,7 @@ SP_STRUCT_ARR(TaskList, Task);
 typedef struct {
     Id id;
     DVector2 position;
+    Vector2 norm_coords;
     DVector2 size;
     Color color;
 } Rect;
@@ -94,6 +95,7 @@ typedef struct {
     Id id;
     const char *str;
     DVector2 position;
+    Vector2 norm_coords;
     f32 font_size;
     Color color;
 } Text;

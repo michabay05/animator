@@ -199,18 +199,19 @@ static void spc__preview_render(void)
     BeginDrawing(); {
         spc__main_render();
 
-        int pos[2] = {10, 10};
-        DrawFPS(pos[0], pos[1]);
+        IVector2 pos = {10, 10};
+        DrawFPS(pos.x, pos.y);
         DrawText(
             TextFormat(ctx.dt_mul > 0 ? "%dx" : "1/%dx", abs(ctx.dt_mul)),
-            pos[0], pos[1] + 25, 20, WHITE
+            pos.x, pos.y + 25, 20, WHITE
         );
-        if (ctx.paused) DrawText("Paused", pos[0], pos[1] + 2*25, 20, WHITE);
+        if (ctx.paused) DrawText("Paused", pos.x, pos.y + 2*25, 20, WHITE);
     } EndDrawing();
 }
 
 static void spc__output_render(void)
 {
+    // Render to the render texture
     BeginTextureMode(ctx.rtex); {
         spc__main_render();
 
@@ -223,6 +224,7 @@ static void spc__output_render(void)
         UnloadImage(image);
     } EndTextureMode();
 
+    // Render to preview window
     BeginDrawing(); {
         f32 font_size = 40;
         f32 spacing = 2.0;
@@ -284,6 +286,8 @@ void spc_new_task(f64 duration)
 void spc_add_action(Action action)
 {
     if (ctx.tasks.count == 0) {
+        // NOTE: Added a task here to make sure the code below will have at
+        // least one task to attach the action to.
         spc_new_task(0.0);
     }
 

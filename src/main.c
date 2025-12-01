@@ -1,5 +1,4 @@
 #include "raylib.h"
-#include "umka_api.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -12,23 +11,22 @@
 int main(void)
 {
     const char *filename = "./test.um";
-    bool success = spc_init(filename);
+    bool success = spc_init(filename, RM_Output);
     if (!success) return 1;
 
-    int dt_mul = 1;
     while (!ctx.quit && !WindowShouldClose()) {
         if (IsKeyPressed(KEY_SPACE)) {
             ctx.paused = !ctx.paused;
         }
         if (IsKeyPressed(KEY_LEFT_SHIFT)) {
-            dt_mul--;
-            if (dt_mul == 0) dt_mul = -2;
+            ctx.dt_mul--;
+            if (ctx.dt_mul == 0) ctx.dt_mul = -2;
         }
         if (IsKeyPressed(KEY_RIGHT_SHIFT)) {
-            dt_mul++;
-            if (dt_mul == -1) dt_mul = 1;
+            ctx.dt_mul++;
+            if (ctx.dt_mul == -1) ctx.dt_mul = 1;
         }
-        if (IsKeyPressed(KEY_R)) {
+        if (IsKeyPressed(KEY_H)) {
             spc_reset();
             printf("Restarted animation\n");
         }
@@ -39,22 +37,12 @@ int main(void)
         }
 
         if (!ctx.paused) {
-            SP_ASSERT(dt_mul != 0);
-            f32 mult = dt_mul > 0 ? (f32)dt_mul : 1.0 / (f32)abs(dt_mul);
+            SP_ASSERT(ctx.dt_mul != 0);
+            f32 mult = ctx.dt_mul > 0 ? (f32)ctx.dt_mul : 1.0 / (f32)abs(ctx.dt_mul);
             spc_update(GetFrameTime() * mult);
         }
 
-        BeginDrawing(); {
-            spc_render();
-
-            int pos[2] = {10, 10};
-            DrawFPS(pos[0], pos[1]);
-            DrawText(
-                TextFormat(dt_mul > 0 ? "%dx" : "1/%dx", abs(dt_mul)),
-                pos[0], pos[1] + 25, 20, WHITE
-            );
-            if (ctx.paused) DrawText("Paused", pos[0], pos[1] + 2*25, 20, WHITE);
-        } EndDrawing();
+        spc_render();
     }
 
     spc_deinit();

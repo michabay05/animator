@@ -186,16 +186,16 @@ bool ffmpeg_end_rendering(FFMPEG *ffmpeg, bool cancel)
     assert(0 && "unreachable");
 }
 
-bool ffmpeg_send_frame_flipped(FFMPEG *ffmpeg, void *data, size_t width, size_t height)
+bool ffmpeg_send_frame(FFMPEG *ffmpeg, void *data, size_t width, size_t height)
 {
-    write(ffmpeg->pipe, (uint32_t*)data, width*height*sizeof(uint32_t));
-    // for (size_t y = height; y > 0; --y) {
-    //     // TODO: write() may not necessarily write the entire row. We may want to repeat the call.
-    //     if (write(ffmpeg->pipe, (uint32_t*)data + (y - 1)*width, sizeof(uint32_t)*width) < 0) {
-    //         TraceLog(LOG_ERROR, "FFMPEG: failed to write frame into ffmpeg pipe: %s", strerror(errno));
-    //         return false;
-    //     }
-    // }
+    // write(ffmpeg->pipe, (uint32_t*)data, width*height*sizeof(uint32_t));
+    for (size_t y = height; y > 0; --y) {
+        // TODO: write() may not necessarily write the entire row. We may want to repeat the call.
+        if (write(ffmpeg->pipe, (uint32_t*)data + (y - 1)*width, sizeof(uint32_t)*width) < 0) {
+            TraceLog(LOG_ERROR, "FFMPEG: failed to write frame into ffmpeg pipe: %s", strerror(errno));
+            return false;
+        }
+    }
     return true;
 }
 

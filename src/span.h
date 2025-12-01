@@ -2,6 +2,7 @@
 #define _SPAN_H_
 
 #include <stdint.h>
+#include "ffmpeg.h"
 #include "raylib.h"
 #include "arena.h"
 #include "umka_api.h"
@@ -138,11 +139,17 @@ typedef struct {
     f32 t;
     bool paused, quit;
 
-    IVector2 res;
+    // NOTE: preview window resolution, output video resolution
+    IVector2 pres, vres;
     Camera2D cam;
     int fps;
     RenderMode render_mode;
     RenderTexture rtex;
+    // NOTE: I'm not sure how to name this...essentially, if it is >= 1, dt
+    // is multiplied by it. If it's < -1, then dt is divided by it. It can't be zero.
+    int dt_mul;
+
+    FFMPEG *ffmpeg;
 } Context;
 
 #define UNIT_TO_PX 50
@@ -151,9 +158,9 @@ typedef struct {
 extern Arena arena;
 extern Context ctx;
 
-bool spc_init(const char *filename);
+bool spc_init(const char *filename, RenderMode mode);
 bool spc_umka_init(const char *filename);
-void spc_renderer_init(void);
+void spc_renderer_init(RenderMode mode);
 void spc_deinit(void);
 void spc_update(f32 dt);
 void spc_render(void);

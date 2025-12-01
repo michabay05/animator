@@ -2,22 +2,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include "span.h"
+#include "ffmpeg.h"
 #include "raylib.h"
 #include "raymath.h"
 
 Arena arena = {0};
 Context ctx = {0};
 
-bool spc_init(const char *filename)
+bool spc_init(const char *filename, RenderMode mode)
 {
     ctx = (Context){0};
     ctx.umka = NULL;
     ctx.easing = EM_Sine;
+    ctx.dt_mul = 1;
 
     bool ok = spc_umka_init(filename);
     if (!ok) return false;
 
-    spc_renderer_init();
+    spc_renderer_init(mode);
     return true;
 }
 
@@ -68,43 +70,49 @@ bool spc_umka_init(const char *filename)
     return true;
 }
 
-void spc_renderer_init(void)
+void spc_renderer_init(RenderMode mode)
 {
-    // Initialize renderer
-    ctx.render_mode = RM_Preview;
+    ctx.pres = (IVector2){ 800, 600 };
+    InitWindow(ctx.pres.x, ctx.pres.y, "span");
+    ctx.fps = 60;
+    SetTargetFPS(ctx.fps);
 
-    switch (ctx.render_mode) {
+    switch (mode) {
         case RM_Preview: {
-            ctx.res = (IVector2){ 800, 600 };
+            ctx.vres = ctx.pres;
         } break;
 
         case RM_Output: {
-            ctx.res = (IVector2){ 1280, 720 };
+            ctx.vres = (IVector2){ 3840, 2160 };
+            ctx.rtex = LoadRenderTexture(ctx.vres.x, ctx.vres.y);
+            ctx.ffmpeg = ffmpeg_start_rendering_video(
+                "out.mp4", (size_t)ctx.vres.x, (size_t)ctx.vres.y, (size_t)ctx.fps);
         } break;
 
         default: {
-            SP_UNREACHABLEF("Unknown render mode: %d", ctx.render_mode);
+            SP_UNREACHABLEF("Unknown mode of render: %d", mode);
         } break;
     }
-
-    InitWindow(ctx.res.x, ctx.res.y, "span");
+    ctx.render_mode = mode;
 
     ctx.cam = (Camera2D) {
-        .offset = Vector2Scale(spv_itof(ctx.res), 0.5),
+        .offset = Vector2Scale(spv_itof(ctx.vres), 0.5),
         .target = Vector2Zero(),
         .rotation = 0.0f,
         .zoom = 1.0f,
     };
-    ctx.fps = 60;
-    SetTargetFPS(ctx.fps);
-
-    ctx.rtex = LoadRenderTexture(ctx.res.x, ctx.res.y);
 }
 
 void spc_deinit(void)
 {
-    CloseWindow();
     umkaFree(ctx.umka);
+
+    if (ctx.render_mode == RM_Output) {
+        ffmpeg_end_rendering(ctx.ffmpeg, false);
+        UnloadRenderTexture(ctx.rtex);
+    }
+    CloseWindow();
+
     arena_free(&arena);
 }
 
@@ -168,7 +176,7 @@ void spc_update(f32 dt)
     }
 }
 
-void spc_render(void)
+static void spc__main_render(void)
 {
     ClearBackground(BLACK);
 
@@ -181,6 +189,65 @@ void spc_render(void)
     } EndMode2D();
 }
 
+static void spc__preview_render(void)
+{
+    BeginDrawing(); {
+        spc__main_render();
+
+        int pos[2] = {10, 10};
+        DrawFPS(pos[0], pos[1]);
+        DrawText(
+            TextFormat(ctx.dt_mul > 0 ? "%dx" : "1/%dx", abs(ctx.dt_mul)),
+            pos[0], pos[1] + 25, 20, WHITE
+        );
+        if (ctx.paused) DrawText("Paused", pos[0], pos[1] + 2*25, 20, WHITE);
+    } EndDrawing();
+}
+
+static void spc__output_render(void)
+{
+    BeginTextureMode(ctx.rtex); {
+        spc__main_render();
+
+        SetTraceLogLevel(LOG_WARNING);
+        Image image = LoadImageFromTexture(ctx.rtex.texture);
+        SetTraceLogLevel(LOG_INFO);
+        if (!ffmpeg_send_frame(ctx.ffmpeg, image.data, image.width, image.height)) {
+            ffmpeg_end_rendering(ctx.ffmpeg, true);
+        }
+        UnloadImage(image);
+    } EndTextureMode();
+
+    BeginDrawing(); {
+        f32 font_size = 40;
+        f32 spacing = 2.0;
+        Font font = GetFontDefault();
+
+        const char *text = "Rendering...";
+        Vector2 text_dim = MeasureTextEx(font, text, font_size, spacing);
+        Vector2 pos = Vector2Scale(spv_itof(ctx.pres), 0.5);
+        pos = Vector2Subtract(pos, Vector2Scale(text_dim, 0.5));
+
+        DrawTextEx(font, text, pos, font_size, spacing, WHITE);
+    } EndDrawing();
+}
+
+void spc_render(void)
+{
+    switch (ctx.render_mode) {
+        case RM_Preview: {
+            spc__preview_render();
+        } break;
+
+        case RM_Output: {
+            spc__output_render();
+        } break;
+
+        default: {
+            SP_UNREACHABLEF("Unknown mode of render: %d", ctx.render_mode);
+        } break;
+    }
+}
 
 Id spc_next_id(void)
 {

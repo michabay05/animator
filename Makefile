@@ -25,4 +25,4 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(COMP) $(COMMON_COMPFLAGS) $(COMPFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJDIR_DEBUG)/* $(OBJDIR_RELEASE)/* $(BINDIR_DEBUG)/* $(BINDIR_RELEASE)/*
+	rm -rf $(OBJDIR)/*

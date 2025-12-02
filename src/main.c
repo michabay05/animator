@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include "rlgl.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,7 +18,8 @@ Vector2 plot_xy(Vector2 origin, Rectangle box, f32 xmin, f32 xmax, f32 ymin, f32
 
     return (Vector2) {
         origin.x + ((pt.x / (xmax - xmin)) * box.width),
-        origin.y + ((pt.y / (ymax - ymin)) * box.height)
+        (origin.y + ((pt.y / (ymax - ymin)) * box.height)) * -1.f
+        // origin.y + ((pt.y / (ymax - ymin)) * box.height)
     };
 }
 
@@ -28,6 +30,7 @@ int main(void)
     SetTraceLogLevel(LOG_WARNING);
     InitWindow(res.x, res.y, "span - axes test");
 
+    // Vector2 fres = spv_itof(res);
     Camera2D cam = {
         .offset = Vector2Scale(spv_itof(res), 0.5),
         .target = Vector2Zero(),
@@ -35,18 +38,12 @@ int main(void)
         .zoom = 1.0f,
     };
 
-    f32 xmin = -1.f;
+    f32 xmin = 0.f;
     f32 xmax = 10.f;
     f32 ymin = -3.f;
     f32 ymax = 10.f;
 
-    ymin *= -1.f;
-    ymax *= -1.f;
-    // f32 max = ymax;
-    // ymax = ymin;
-    // ymin = max;
-
-    Vector2 sz = { 500.0f, 500.0f };
+    Vector2 sz = { 550.f, 550.f };
     Vector2 center = {0};
     Vector2 pos = Vector2Subtract(center, Vector2Scale(sz, 0.5));
     Rectangle box = {
@@ -71,24 +68,29 @@ int main(void)
     int ind = 0;
     for (f32 x = xmin; x <= xmax; x += dx, ind++) {
         pts[ind] = (Vector2) {x, (x-3.f)*(x-3.f) + 2};
-        // SP_PRINT_V2(pts[ind]);
     }
 
     while (!WindowShouldClose()) {
+
         BeginDrawing();
         ClearBackground(BLACK);
 
+        Vector2 start, end;
         BeginMode2D(cam); {
-            // DrawRectangleLinesEx(box, 2.0f, RED);
-            // Vertical axis
-            Vector2 start = {origin_pos.x, box.y};
-            Vector2 end = {origin_pos.x, box.y + box.height};
-            DrawLineEx(start, end, 2.0f, RED);
+            DrawRectangleLinesEx(box, 2.f, LIGHTGRAY);
+            if (xmin <= 0.f && 0.f <= xmax) {
+                // Vertical axis
+                start = (Vector2){origin_pos.x, box.y};
+                end = (Vector2){origin_pos.x, box.y + box.height};
+                DrawLineEx(start, end, 2.0f, RED);
+            }
 
-            // Horizontal axis
-            start = (Vector2) {box.x, origin_pos.y};
-            end = (Vector2) {box.x + box.width, origin_pos.y};
-            DrawLineEx(start, end, 2.0f, RED);
+            if (ymin <= 0.f && 0.f <= ymax) {
+                // Horizontal axis
+                start = (Vector2) {box.x, -origin_pos.y};
+                end = (Vector2) {box.x + box.width, -origin_pos.y};
+                DrawLineEx(start, end, 2.0f, RED);
+            }
 
             for (int i = 1; i < n; i++) {
                 Vector2 s = plot_xy(origin_pos, box, xmin, xmax, ymin, ymax, pts[i-1]);

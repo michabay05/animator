@@ -7,6 +7,7 @@
 #include "arena.h"
 #include "umka_api.h"
 
+
 #define SP_LEN(arr) ((int)(sizeof(arr) / sizeof(arr[0])))
 #define SP_ASSERT assert
 #define SP_UNUSED(x) ((void)x)

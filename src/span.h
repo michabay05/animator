@@ -43,6 +43,7 @@ typedef struct {
 typedef struct {
     f64 x, y;
 } DVector2;
+SP_STRUCT_ARR(PointList, DVector2);
 
 // NOTE: Don't rearrange order without modifying Umka enum
 typedef enum {
@@ -195,5 +196,6 @@ f32 sp_easing(f32 t, f32 duration);
 Vector2 spv_dtof(DVector2 dv);
 DVector2 spv_ftod(Vector2 v);
 Vector2 spv_itof(IVector2 iv);
+DVector2 spv_lerpd(DVector2 start, DVector2 end, f64 factor);
 
 #endif // _SPAN_H_

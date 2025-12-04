@@ -765,3 +765,14 @@ Vector2 spv_itof(IVector2 iv)
         .y = (f32)iv.y,
     };
 }
+
+DVector2 spv_lerpd(DVector2 start, DVector2 end, f64 factor)
+{
+    if (factor < 0.0) factor = 0.0;
+    if (factor > 1.0) factor = 1.0;
+
+    return (DVector2) {
+        .x = start.x + (end.x - start.x)*factor,
+        .y = start.y + (end.y - start.y)*factor,
+    };
+}

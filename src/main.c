@@ -10,17 +10,21 @@
 // TODO:
 //   - [ ] Handle delay for each action
 
-Vector2 plot_xy(Vector2 origin, Rectangle box, f32 xmin, f32 xmax, f32 ymin, f32 ymax, Vector2 pt)
+Vector2 plot_xy(Vector2 origin, Rectangle box, f32 xmin, f32 xmax, f32 ymin, f32 ymax, DVector2 point)
 {
     SP_ASSERT(xmin <= xmax);
-    // SP_ASSERT(ymin >= ymax);
-    SP_ASSERT(xmin <= pt.x && pt.x <= xmax);
 
+    Vector2 pt = spv_dtof(point);
     return (Vector2) {
         origin.x + ((pt.x / (xmax - xmin)) * box.width),
         (origin.y + ((pt.y / (ymax - ymin)) * box.height)) * -1.f
         // origin.y + ((pt.y / (ymax - ymin)) * box.height)
     };
+}
+
+f32 foo(f32 t, f32 duration)
+{
+    return -0.5*cosf(PI / duration * t) + 0.5;
 }
 
 int main(void)
@@ -29,6 +33,7 @@ int main(void)
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     SetTraceLogLevel(LOG_WARNING);
     InitWindow(res.x, res.y, "span - axes test");
+    SetTargetFPS(60);
 
     // Vector2 fres = spv_itof(res);
     Camera2D cam = {
@@ -38,10 +43,10 @@ int main(void)
         .zoom = 1.0f,
     };
 
-    f32 xmin = 0.f;
-    f32 xmax = 10.f;
-    f32 ymin = -3.f;
-    f32 ymax = 10.f;
+    f32 xmin = -4.f;
+    f32 xmax = 4.f;
+    f32 ymin = -30.f;
+    f32 ymax = 5.f;
 
     Vector2 sz = { 550.f, 550.f };
     Vector2 center = {0};
@@ -62,20 +67,45 @@ int main(void)
     };
     Vector2 origin_pos = Vector2Multiply(Vector2Negate(center_coord), coord_size);
 
-    Vector2 pts[400] = {0};
-    int n = SP_LEN(pts);
-    f32 dx = (xmax - xmin) / (f32)(n-1);
+    PointList pts = {0};
+    int n = 100;
+    f64 dx = (xmax - xmin) / (f32)(n-1);
     int ind = 0;
-    for (f32 x = xmin; x <= xmax; x += dx, ind++) {
-        pts[ind] = (Vector2) {x, (x-3.f)*(x-3.f) + 2};
+    for (f64 x = xmin; x <= xmax; x += dx, ind++) {
+        DVector2 p = {x, 0.25*x*x*x*x + x*x*x/6 - (14/3)*x*x};
+        arena_da_append(&arena, &pts, p);
     }
 
+    f32 total_t = 0.f;
+    f32 total_dur = 0.25f;
+    f32 t = 0.f;
+    f32 duration = total_dur / (f32)n;
+    bool paused = true;
+    Vector2 start, end;
+    int prev = 0, current = 1;
+    DVector2 v = pts.items[prev];
     while (!WindowShouldClose()) {
+        if (IsKeyPressed(KEY_SPACE)) {
+            paused = !paused;
+        }
+
+        if (!paused) {
+            if (t < (f32)duration) {
+                t += GetFrameTime();
+                v = spv_lerpd(
+                    pts.items[prev], pts.items[current],
+                    foo(t, duration));
+            } else {
+                prev = current;
+                if (current < pts.count - 1) current++;
+                total_t += GetFrameTime();
+                t = 0.f;
+            }
+        }
 
         BeginDrawing();
         ClearBackground(BLACK);
 
-        Vector2 start, end;
         BeginMode2D(cam); {
             DrawRectangleLinesEx(box, 2.f, LIGHTGRAY);
             if (xmin <= 0.f && 0.f <= xmax) {
@@ -92,81 +122,25 @@ int main(void)
                 DrawLineEx(start, end, 2.0f, RED);
             }
 
-            for (int i = 1; i < n; i++) {
-                Vector2 s = plot_xy(origin_pos, box, xmin, xmax, ymin, ymax, pts[i-1]);
-                Vector2 e = plot_xy(origin_pos, box, xmin, xmax, ymin, ymax, pts[i]);
+            for (int i = 1; i <= prev; i++) {
+                Vector2 s0 = plot_xy(origin_pos, box, xmin, xmax, ymin, ymax, pts.items[i-1]);
+                Vector2 e0 = plot_xy(origin_pos, box, xmin, xmax, ymin, ymax, pts.items[i]);
 
-                DrawLineEx(s, e, 3.5f, BLUE);
-                // DrawCircleV(s, 5.0f, WHITE);
-                // DrawCircleV(e, 5.0f, WHITE);
+                DrawLineEx(s0, e0, 3.5f, BLUE);
+                // DrawCircleV(s0, 5.f, WHITE);
+                // DrawCircleV(e0, 5.f, WHITE);
             }
+
+            Vector2 s1 = plot_xy(origin_pos, box, xmin, xmax, ymin, ymax, pts.items[prev]);
+            Vector2 v1 = plot_xy(origin_pos, box, xmin, xmax, ymin, ymax, v);
+            DrawLineEx(s1, v1, 3.5f, BLUE);
         } EndMode2D();
 
+        DrawFPS(10, 10);
         EndDrawing();
     }
 
     CloseWindow();
-}
-
-int main3(void)
-{
-    IVector2 res = { 800, 600 };
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(res.x, res.y, "span - axes test");
-
-    Camera2D cam = {
-        .offset = Vector2Scale(spv_itof(res), 0.5),
-        .target = Vector2Zero(),
-        .rotation = 0.0f,
-        .zoom = 1.0f,
-    };
-
-    Vector2 sz = { 500.0f, 500.0f };
-    Vector2 center = {0};
-    Vector2 pos = Vector2Subtract(center, Vector2Scale(sz, 0.5));
-    Rectangle box = {
-        .x = pos.x,
-        .y = pos.y,
-        .width = sz.x,
-        .height = sz.y,
-    };
-    Vector2 origin = { box.x + 0.5*box.width, box.y + 0.5*box.height };
-
-    f32 xmin = -10.f;
-    f32 xmax = 10.f;
-    f32 ymin = -10.f;
-    f32 ymax = 10.f;
-    f32 dx = 0.5f;
-    f32 dy = 0.5f;
-    while (!WindowShouldClose()) {
-        BeginDrawing();
-        ClearBackground(BLACK);
-
-        BeginMode2D(cam); {
-            // DrawRectangleLinesEx(box, 2.0f, RED);
-            // Vertical axis
-            Vector2 start = {box.x + 0.5f*box.width, box.y};
-            Vector2 end = {box.x + 0.5f*box.width, box.y + box.height};
-            DrawLineEx(start, end, 2.0f, RED);
-
-            // Horizontal axis
-            start = (Vector2) {box.x, box.y + 0.5f*box.height};
-            end = (Vector2) {box.x + box.width, box.y + 0.5f*box.height};
-            DrawLineEx(start, end, 2.0f, RED);
-
-            for (f32 y = ymin; y <= ymax; y += dy) {
-                for (f32 x = xmin; x <= xmax; x += dx) {
-                    Vector2 pt = {x, y};
-                    plot_xy(origin, box, xmin, xmax, ymin, ymax, pt);
-                }
-            }
-        } EndMode2D();
-
-        EndDrawing();
-    }
-
-    CloseWindow();
-    return 0;
 }
 
 int main2(void)

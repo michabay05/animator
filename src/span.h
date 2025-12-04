@@ -43,7 +43,8 @@ typedef struct {
 typedef struct {
     f64 x, y;
 } DVector2;
-SP_STRUCT_ARR(PointList, DVector2);
+
+SP_STRUCT_ARR(PointList, Vector2);
 
 // NOTE: Don't rearrange order without modifying Umka enum
 typedef enum {
@@ -88,7 +89,6 @@ SP_STRUCT_ARR(TaskList, Task);
 typedef struct {
     Id id;
     DVector2 position;
-    Vector2 norm_coords;
     DVector2 size;
     Color color;
 } Rect;

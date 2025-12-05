@@ -44,8 +44,6 @@ typedef struct {
     f64 x, y;
 } DVector2;
 
-SP_STRUCT_ARR(PointList, Vector2);
-
 // NOTE: Don't rearrange order without modifying Umka enum
 typedef enum {
     AK_Enable,
@@ -87,14 +85,12 @@ typedef struct {
 SP_STRUCT_ARR(TaskList, Task);
 
 typedef struct {
-    Id id;
     DVector2 position;
     DVector2 size;
     Color color;
 } Rect;
 
 typedef struct {
-    Id id;
     const char *str;
     DVector2 position;
     Vector2 norm_coords;
@@ -102,17 +98,38 @@ typedef struct {
     Color color;
 } Text;
 
+SP_STRUCT_ARR(PointList, Vector2);
+// NOTE: Personally, I prefer that "children" don't possess any knowledge of
+// their environment and who their "parent" is. But, for this one case, I
+// will try to ignore that and give curves knowledge of their "parent": axes
+typedef struct {
+    Id axes_id;
+    PointList pts;
+    Color color;
+} Curve;
+
+typedef struct {
+    f64 xmin, xmax, ymin, ymax;
+    Rectangle box;
+    Vector2 origin_pos, coord_size, center_coord;
+} Axes;
+
 typedef enum {
     OK_RECT,
     OK_TEXT,
+    OK_AXES,
+    OK_CURVE,
 } ObjKind;
 
 typedef struct {
+    Id id;
     ObjKind kind;
     bool enabled;
     union {
         Rect rect;
         Text text;
+        Axes axes;
+        Curve curve;
     } as;
 } Obj;
 SP_STRUCT_ARR(ObjList, Obj);
@@ -162,6 +179,8 @@ typedef struct {
 extern Arena arena;
 extern Context ctx;
 
+// TODO: all of these function do not need to be here; some should just be
+// static and in the `span.c` file.
 bool spc_init(const char *filename, RenderMode mode);
 bool spc_umka_init(const char *filename);
 void spc_renderer_init(RenderMode mode);
@@ -186,6 +205,9 @@ bool spu_call_fn(const char *fn_name, UmkaStackSlot **slot, size_t storage_bytes
 bool spu_content_w_preamble(const char *filename, char **content);
 void spuo_rect(UmkaStackSlot *p, UmkaStackSlot *r);
 void spuo_text(UmkaStackSlot *p, UmkaStackSlot *r);
+void spuo_axes(UmkaStackSlot *p, UmkaStackSlot *r);
+void spuo_curve(UmkaStackSlot *p, UmkaStackSlot *r);
+void spuo_enable(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_fade_in(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_fade_out(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_move(UmkaStackSlot *p, UmkaStackSlot *r);

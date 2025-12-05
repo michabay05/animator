@@ -1,4 +1,9 @@
 fn sequence(): void {
+    ax := axes();
+    c := curve(ax);
+    enable(ax);
+    enable(c);
+    /*
     color := Color{155, 10, 255, 255};
     r := rect(Vec2{0,0}, Vec2{1,1}, color);
     t := text("What is good bois?", Vec2{2,2}, 30, color);
@@ -17,4 +22,5 @@ fn sequence(): void {
     fade_out(r);
     fade_out(t);
     play();
+    */
 }

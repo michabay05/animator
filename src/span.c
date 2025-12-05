@@ -5,6 +5,7 @@
 #include "ffmpeg.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "umka_api.h"
 
 Arena arena = {0};
 Context ctx = {0};
@@ -44,11 +45,16 @@ bool spc_umka_init(const char *filename)
     UmkaFunc fns[] = {
         (UmkaFunc){.name = "rect", .func = &spuo_rect},
         (UmkaFunc){.name = "text", .func = &spuo_text},
+        (UmkaFunc){.name = "axes", .func = &spuo_axes},
+        (UmkaFunc){.name = "curve", .func = &spuo_curve},
+
         (UmkaFunc){.name = "fade_in", .func = &spu_fade_in},
         (UmkaFunc){.name = "fade_out", .func = &spu_fade_out},
         (UmkaFunc){.name = "move", .func = &spu_move},
         (UmkaFunc){.name = "wait", .func = &spu_wait},
         (UmkaFunc){.name = "play", .func = &spu_play},
+
+        (UmkaFunc){.name = "enable", .func = &spuo_enable},
     };
     for (int i = 0; i < SP_LEN(fns); i++) {
         ok = umkaAddFunc(ctx.umka, fns[i].name, fns[i].func);
@@ -320,7 +326,7 @@ void spc_reset(void)
 void spc_clear_tasks(void)
 {
     // NOTE (cont.): It just means that I will move the count variable
-    // to zero so as towrite new tasks over the old ones. The memory
+    // to zero so as to write new tasks over the old ones. The memory
     // will cleaned up at the end.
     ctx.tasks.count = 0;
 }
@@ -328,11 +334,11 @@ void spc_clear_tasks(void)
 Obj spo_rect(DVector2 pos, DVector2 size, Color color)
 {
     return (Obj) {
+        .id = spc_next_id(),
         .kind = OK_RECT,
         .enabled = false,
         .as = {
             .rect = {
-                .id = spc_next_id(),
                 .position = pos,
                 .size = size,
                 .color = color,
@@ -344,15 +350,93 @@ Obj spo_rect(DVector2 pos, DVector2 size, Color color)
 Obj spo_text(const char *str, DVector2 pos, f32 font_size, Color color)
 {
     return (Obj) {
+        .id = spc_next_id(),
         .kind = OK_TEXT,
         .enabled = false,
         .as = {
             .text = {
-                .id = spc_next_id(),
                 .str = arena_strdup(&arena, str),
                 .position = pos,
                 .font_size = font_size,
                 .color = color,
+            }
+        }
+    };
+}
+
+Obj spo_axes(Vector2 center, f32 xmin, f32 xmax, f32 ymin, f32 ymax)
+{
+    Vector2 size = {550.f, 550.f};
+    Vector2 pos = Vector2Subtract(center, Vector2Scale(size, 0.5));
+
+    Axes axes = {
+        .xmin = xmin, .xmax = xmax, .ymin = ymin, .ymax = ymax,
+        .box = (Rectangle){
+            .x = pos.x,
+            .y = pos.y,
+            .width = size.x,
+            .height = size.y,
+        },
+    };
+    axes.center_coord = (Vector2) {
+        .x = 0.5f * (axes.xmax + axes.xmin),
+        .y = 0.5f * (axes.ymax + axes.ymin),
+    };
+    axes.coord_size = (Vector2) {
+        .x = axes.box.width / (int)(axes.xmax - axes.xmin),
+        .y = axes.box.height / (int)(axes.ymax - axes.ymin),
+    };
+    axes.origin_pos = Vector2Multiply(
+        Vector2Subtract(center, axes.center_coord),
+        axes.coord_size
+    );
+
+    return (Obj){
+        .id = spc_next_id(),
+        .kind = OK_AXES,
+        .enabled = false,
+        .as = { .axes = axes },
+    };
+}
+
+static Vector2 spo_curve_plot(const Axes *const axes, Vector2 pt)
+{
+    SP_ASSERT(axes->xmin <= axes->xmax);
+
+    return (Vector2) {
+        axes->origin_pos.x + ((pt.x / (axes->xmax - axes->xmin)) * axes->box.width),
+        (axes->origin_pos.y + ((pt.y / (axes->ymax - axes->ymin)) * axes->box.height)) * -1.f
+    };
+}
+
+Obj spo_curve(Id axes_id)
+{
+    Obj axes_obj = ctx.objs.items[axes_id];
+    SP_ASSERT(axes_obj.kind == OK_AXES);
+    const Axes *axes = &axes_obj.as.axes;
+
+    PointList pts = {0};
+    int n = 50;
+    f64 dx = (axes->xmax - axes->xmin) / (f32)(n-1);
+    Vector2 p = {0};
+    for (f64 x = axes->xmin; x <= axes->xmax; x += dx) {
+        p = (Vector2){x, 10.f*cosf(2*PI*x)-15.f};
+        // p = spo_curve_plot(axes, p);
+        arena_da_append(&arena, &pts, p);
+    }
+    // NOTE: Padding final value for catmull-rom spline rendering is required
+    // to ensure that the final point gets rendered
+    arena_da_append(&arena, &pts, p);
+
+    return (Obj) {
+        .id = spc_next_id(),
+        .enabled = false,
+        .kind = OK_CURVE,
+        .as = {
+            .curve = {
+                .axes_id = axes_id,
+                .pts = pts,
+                .color = BLUE,
             }
         }
     };
@@ -439,6 +523,33 @@ void spo_render(Obj obj)
                 spv__adjusted_value(font_size),
                 spv__adjusted_value(spacing),
                 t.color);
+        } break;
+
+        case OK_AXES: {
+            const Axes *axes = &obj.as.axes;
+            Vector2 start, end;
+            f32 thickness = 2.f;
+            // NOTE: Boundary rectangle - render only for debug purposes
+            // DrawRectangleLinesEx(axes->box, 2.f, LIGHTGRAY);
+
+            if (axes->xmin <= 0.f && 0.f <= axes->xmax) {
+                // Vertical axis
+                start = (Vector2){axes->origin_pos.x, axes->box.y};
+                end = (Vector2){axes->origin_pos.x, axes->box.y + axes->box.height};
+                DrawLineEx(start, end, thickness, RED);
+            }
+
+            if (axes->ymin <= 0.f && 0.f <= axes->ymax) {
+                // Horizontal axis
+                start = (Vector2) {axes->box.x, -axes->origin_pos.y};
+                end = (Vector2) {axes->box.x + axes->box.width, -axes->origin_pos.y};
+                DrawLineEx(start, end, thickness, RED);
+            }
+        } break;
+
+        case OK_CURVE: {
+            Curve c = obj.as.curve;
+            DrawSplineCatmullRom(c.pts.items, c.pts.count, 4.f, c.color);
         } break;
 
         default: {
@@ -570,6 +681,40 @@ void spuo_text(UmkaStackSlot *p, UmkaStackSlot *r)
 
     arena_da_append(&arena, &ctx.objs, rect);
     arena_da_append(&arena, &ctx.orig_objs, rect);
+}
+
+void spuo_axes(UmkaStackSlot *p, UmkaStackSlot *r)
+{
+    DVector2 center = *(DVector2 *)umkaGetParam(p, 0);
+    f64 xmin = *(f64 *)umkaGetParam(p, 1);
+    f64 xmax = *(f64 *)umkaGetParam(p, 2);
+    f64 ymin = *(f64 *)umkaGetParam(p, 3);
+    f64 ymax = *(f64 *)umkaGetParam(p, 4);
+
+    Obj axes = spo_axes(spv_dtof(center), xmin, xmax, ymin, ymax);
+    umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
+
+    arena_da_append(&arena, &ctx.objs, axes);
+    arena_da_append(&arena, &ctx.orig_objs, axes);
+}
+
+void spuo_curve(UmkaStackSlot *p, UmkaStackSlot *r)
+{
+    Id axes_id = *(Id *)umkaGetParam(p, 0);
+
+    Obj axes = spo_curve(axes_id);
+    umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
+
+    arena_da_append(&arena, &ctx.objs, axes);
+    arena_da_append(&arena, &ctx.orig_objs, axes);
+}
+
+void spuo_enable(UmkaStackSlot *p, UmkaStackSlot *r)
+{
+    SP_UNUSED(r);
+    Id obj_id = *(Id *)umkaGetParam(p, 0);
+
+    spc_add_action(spo_enable(obj_id));
 }
 
 void spu_fade_in(UmkaStackSlot *p, UmkaStackSlot *r)

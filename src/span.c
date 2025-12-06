@@ -6,12 +6,17 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "umka_api.h"
+#include "../nob.h"
 
 Arena arena = {0};
 Context ctx = {0};
 
 bool spc_init(const char *filename, RenderMode mode)
 {
+    // NOTE: The initialization goes through three steps:
+    //   (1) Umka: compile script, load objs and actions
+    //   (2) Raylib: initialize window and other related things
+
     ctx = (Context){0};
     ctx.umka = NULL;
     ctx.easing = EM_Sine;
@@ -21,6 +26,8 @@ bool spc_init(const char *filename, RenderMode mode)
     if (!ok) return false;
 
     spc_renderer_init(mode);
+
+    spc_run_umka();
     return true;
 }
 
@@ -35,7 +42,6 @@ bool spc_umka_init(const char *filename)
     if (ctx.umka == NULL) {
         ctx.umka = umkaAlloc();
     }
-
     ok = umkaInit(ctx.umka, NULL, content, 1024 * 1024, NULL, 0, NULL, false, false, NULL);
     if (!ok) {
         spu_print_err();
@@ -47,6 +53,7 @@ bool spc_umka_init(const char *filename)
         (UmkaFunc){.name = "text", .func = &spuo_text},
         (UmkaFunc){.name = "axes", .func = &spuo_axes},
         (UmkaFunc){.name = "curve", .func = &spuo_curve},
+        (UmkaFunc){.name = "typst", .func = &spuo_typst},
 
         (UmkaFunc){.name = "fade_in", .func = &spu_fade_in},
         (UmkaFunc){.name = "fade_out", .func = &spu_fade_out},
@@ -69,16 +76,13 @@ bool spc_umka_init(const char *filename)
         spu_print_err();
         return false;
     }
-    spu_run_sequence();
-    spc_reset();
-
-    printf("Loaded %d tasks.\n", ctx.tasks.count);
     return true;
 }
 
 void spc_renderer_init(RenderMode mode)
 {
     ctx.pres = (IVector2){ 800, 600 };
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(ctx.pres.x, ctx.pres.y, "span");
     ctx.fps = 60;
     SetTargetFPS(ctx.fps);
@@ -97,7 +101,7 @@ void spc_renderer_init(RenderMode mode)
 
             ctx.rtex = LoadRenderTexture(ctx.vres.x, ctx.vres.y);
             ctx.ffmpeg = ffmpeg_start_rendering_video(
-                "out.mp4", (size_t)ctx.vres.x, (size_t)ctx.vres.y, (size_t)ctx.fps);
+                "out.mov", (size_t)ctx.vres.x, (size_t)ctx.vres.y, (size_t)ctx.fps);
         } break;
 
         default: {
@@ -113,6 +117,13 @@ void spc_renderer_init(RenderMode mode)
         .zoom = 1.0f,
     };
 }
+
+void spc_run_umka(void)
+{
+    spu_run_sequence();
+    spc_reset();
+}
+
 
 void spc_deinit(void)
 {
@@ -322,13 +333,24 @@ void spc_reset(void)
     ctx.quit = false;
 }
 
-// NOTE: Clear tasks does not mean clear the list and free the memory.
-void spc_clear_tasks(void)
+// NOTE: For tasks, clear does not mean clear the list and free the memory.
+void spc_clear_for_recomp(void)
 {
     // NOTE (cont.): It just means that I will move the count variable
     // to zero so as to write new tasks over the old ones. The memory
     // will cleaned up at the end.
     ctx.tasks.count = 0;
+
+    for (int i = 0; i < ctx.objs.count; i++) {
+        Obj *o = &ctx.objs.items[i];
+        switch (o->kind) {
+            case OK_TYPST: {
+                UnloadTexture(o->as.typst.texture);
+            }
+
+            default: break;
+        }
+    }
 }
 
 Obj spo_rect(DVector2 pos, DVector2 size, Color color)
@@ -399,6 +421,54 @@ Obj spo_axes(Vector2 center, f32 xmin, f32 xmax, f32 ymin, f32 ymax)
     };
 }
 
+Obj spo_typst(const char *text, f32 font_size, DVector2 pos, Color color)
+{
+    Typst typ = {
+        .text = text,
+        .font_size = font_size,
+        .position = pos,
+        .color = color,
+    };
+    spo_typst_compile(&typ);
+
+    return (Obj){
+        .id = spc_next_id(),
+        .kind = OK_TYPST,
+        .enabled = false,
+        .as = { .typst = typ },
+    };
+}
+
+bool spo_typst_compile(Typst *typ)
+{
+    if (!IsWindowReady()) {
+        printf("Chillout bruv...\n");
+        return false;
+    }
+
+    Nob_String_Builder sb = {0};
+    nob_sb_appendf(&sb,
+        "#set page(width: auto, height: auto, margin: 0in, fill: none)\n"
+        "#set text(size: %fpt, fill: white)\n"
+        "$ %s $\n", typ->font_size , typ->text);
+
+    bool ok = nob_write_entire_file("input.typ", sb.items, sb.count);
+    if (!ok) return false;
+    nob_sb_free(sb);
+
+    Nob_Cmd cmd = {0};
+    const char *output_path = "output.png";
+    nob_cmd_append(&cmd, "typst", "c", "input.typ", output_path);
+    if (!nob_cmd_run_sync(cmd)) {
+        printf("Failed to run command\n");
+        return false;
+    }
+
+    typ->texture = LoadTexture(output_path);
+    SetTextureFilter(typ->texture, TEXTURE_FILTER_BILINEAR);
+    return true;
+}
+
 static Vector2 spo_curve_plot(const Axes *const axes, Vector2 pt)
 {
     SP_ASSERT(axes->xmin <= axes->xmax);
@@ -416,12 +486,12 @@ Obj spo_curve(Id axes_id)
     const Axes *axes = &axes_obj.as.axes;
 
     PointList pts = {0};
-    int n = 50;
-    f64 dx = (axes->xmax - axes->xmin) / (f32)(n-1);
+    int n = 350;
+    f64 dx = (axes->xmax - axes->xmin) / (f32)n;
     Vector2 p = {0};
     for (f64 x = axes->xmin; x <= axes->xmax; x += dx) {
-        p = (Vector2){x, 10.f*cosf(2*PI*x)-15.f};
-        // p = spo_curve_plot(axes, p);
+        p = (Vector2){x, x*x - 1.f};
+        p = spo_curve_plot(axes, p);
         arena_da_append(&arena, &pts, p);
     }
     // NOTE: Padding final value for catmull-rom spline rendering is required
@@ -453,6 +523,10 @@ void spo_get_pos(Obj *obj, DVector2 **pos)
             *pos = &obj->as.text.position;
         } break;
 
+        case OK_TYPST: {
+            *pos = &obj->as.typst.position;
+        } break;
+
         default: {
             SP_UNREACHABLEF("Unknown kind of object: %d", obj->kind);
         } break;
@@ -468,6 +542,10 @@ void spo_get_color(Obj *obj, Color **color)
 
         case OK_TEXT: {
             *color = &obj->as.text.color;
+        } break;
+
+        case OK_TYPST: {
+            *color = &obj->as.typst.color;
         } break;
 
         default: {
@@ -550,6 +628,15 @@ void spo_render(Obj obj)
         case OK_CURVE: {
             Curve c = obj.as.curve;
             DrawSplineCatmullRom(c.pts.items, c.pts.count, 4.f, c.color);
+        } break;
+
+        case OK_TYPST: {
+            Typst t = obj.as.typst;
+            IVector2 tex_dim = {t.texture.width, t.texture.height};
+            Vector2 pos = Vector2Subtract(
+                Vector2Scale(spv_dtof(t.position), UNIT_TO_PX),
+                Vector2Scale(spv_itof(tex_dim), 0.5));
+            DrawTextureV(t.texture, pos, t.color);
         } break;
 
         default: {
@@ -663,7 +750,7 @@ void spuo_rect(UmkaStackSlot *p, UmkaStackSlot *r)
     Color color = *(Color *)umkaGetParam(p, 2);
 
     Obj rect = spo_rect(pos, size, color);
-    umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
+    umkaGetResult(p, r)->intVal = rect.id;
 
     arena_da_append(&arena, &ctx.objs, rect);
     arena_da_append(&arena, &ctx.orig_objs, rect);
@@ -671,16 +758,16 @@ void spuo_rect(UmkaStackSlot *p, UmkaStackSlot *r)
 
 void spuo_text(UmkaStackSlot *p, UmkaStackSlot *r)
 {
-    const unsigned char *text = (const unsigned char *)(umkaGetParam(p, 0)->ptrVal);
+    const unsigned char *text_str = (const unsigned char *)(umkaGetParam(p, 0)->ptrVal);
     DVector2 pos = *(DVector2 *)umkaGetParam(p, 1);
     f32 font_size = *(f32 *)umkaGetParam(p, 2);
     Color color = *(Color *)umkaGetParam(p, 3);
 
-    Obj rect = spo_text((const char *)text, pos, font_size, color);
-    umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
+    Obj text = spo_text((const char *)text_str, pos, font_size, color);
+    umkaGetResult(p, r)->intVal = text.id;
 
-    arena_da_append(&arena, &ctx.objs, rect);
-    arena_da_append(&arena, &ctx.orig_objs, rect);
+    arena_da_append(&arena, &ctx.objs, text);
+    arena_da_append(&arena, &ctx.orig_objs, text);
 }
 
 void spuo_axes(UmkaStackSlot *p, UmkaStackSlot *r)
@@ -692,7 +779,7 @@ void spuo_axes(UmkaStackSlot *p, UmkaStackSlot *r)
     f64 ymax = *(f64 *)umkaGetParam(p, 4);
 
     Obj axes = spo_axes(spv_dtof(center), xmin, xmax, ymin, ymax);
-    umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
+    umkaGetResult(p, r)->intVal = axes.id;
 
     arena_da_append(&arena, &ctx.objs, axes);
     arena_da_append(&arena, &ctx.orig_objs, axes);
@@ -702,11 +789,25 @@ void spuo_curve(UmkaStackSlot *p, UmkaStackSlot *r)
 {
     Id axes_id = *(Id *)umkaGetParam(p, 0);
 
-    Obj axes = spo_curve(axes_id);
-    umkaGetResult(p, r)->intVal = ctx.id_counter - 1;
+    Obj curve = spo_curve(axes_id);
+    umkaGetResult(p, r)->intVal = curve.id;
 
-    arena_da_append(&arena, &ctx.objs, axes);
-    arena_da_append(&arena, &ctx.orig_objs, axes);
+    arena_da_append(&arena, &ctx.objs, curve);
+    arena_da_append(&arena, &ctx.orig_objs, curve);
+}
+
+void spuo_typst(UmkaStackSlot *p, UmkaStackSlot *r)
+{
+    const unsigned char *text = (const unsigned char *)(umkaGetParam(p, 0)->ptrVal);
+    f32 font_size = (f32)umkaGetParam(p, 1)->realVal;
+    DVector2 pos = *(DVector2 *)umkaGetParam(p, 2);
+    Color color = *(Color *)umkaGetParam(p, 3);
+
+    Obj typst = spo_typst((const char *)text, font_size, pos, color);
+    umkaGetResult(p, r)->intVal = typst.id;
+
+    arena_da_append(&arena, &ctx.objs, typst);
+    arena_da_append(&arena, &ctx.orig_objs, typst);
 }
 
 void spuo_enable(UmkaStackSlot *p, UmkaStackSlot *r)

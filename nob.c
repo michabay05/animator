@@ -30,7 +30,8 @@ void link_objs(size_t n, const char *src_names[n])
     }
     nob_cmd_append(&cmd, "-o", BINARY);
     nob_cmd_append(&cmd, "-L"VENDOR_LIBDIR);
-    nob_cmd_append(&cmd, "-l:libraylib.a", "-l:libumka.a", "-lm");
+    nob_cmd_append(&cmd, "-l:libraylib.a", "-lm");
+    nob_cmd_append(&cmd, "-l:libumka.a");
 }
 
 int main(int argc, char **argv)
@@ -48,16 +49,16 @@ int main(int argc, char **argv)
         }
     }
 
-    const char *source_names[] = { "main", "ffmpeg_linux", "span" };
+    const char *src_names[] = { "main", "ffmpeg_linux", "span" };
 
-    size_t n = NOB_ARRAY_LEN(source_names);
+    size_t n = NOB_ARRAY_LEN(src_names);
     for (size_t i = 0; i < n; i++) {
         cmd.count = 0;
-        compile_objs(source_names[i]);
+        compile_objs(src_names[i]);
         if (!nob_cmd_run_sync(cmd)) return 1;
     }
     cmd.count = 0;
-    link_objs(n, source_names);
+    link_objs(n, src_names);
     if (!nob_cmd_run_sync(cmd)) return 1;
 
     if (run_bin) {

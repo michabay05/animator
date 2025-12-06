@@ -9,6 +9,8 @@ fn text(s: str, pos: Vec2 = Vec2{0, 0}, font_size: real32 = 25.0,
 fn axes(center: Vec2 = Vec2{0, 0}, xmin: real = -3.0, xmax: real = 3.0,
     ymin: real = -3.0, ymax: real = 3.0): Id;
 fn curve(axes_id: Id): Id;
+fn typst(s: str, font_size: real = 25.0, pos: Vec2 = Vec2{0, 0},
+    color: Color = Color{255, 255, 255, 255}): Id;
 
 fn fade_in(id: Id, delay: real = 0.0): void;
 fn fade_out(id: Id, delay: real = 0.0): void;

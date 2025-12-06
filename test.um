@@ -1,26 +1,11 @@
 fn sequence(): void {
-    ax := axes();
-    c := curve(ax);
-    enable(ax);
-    enable(c);
-    /*
-    color := Color{155, 10, 255, 255};
-    r := rect(Vec2{0,0}, Vec2{1,1}, color);
-    t := text("What is good bois?", Vec2{2,2}, 30, color);
-
-    fade_in(r);
+    t := typst("1/20 sin(2theta) = 1/10sin(theta)cos(theta)")
     fade_in(t);
-    play();
+    play(0.5);
 
     wait();
-    play(3);
+    play(1.5);
 
-    move(r, Vec2{-4, -4});
-    move(t, Vec2{4, 4});
-    play();
-
-    fade_out(r);
-    fade_out(t);
-    play();
-    */
+    move(t, Vec2{0,-4});
+    play(0.5);
 }

@@ -1,7 +1,8 @@
 #include "raylib.h"
-
 #define ARENA_IMPLEMENTATION
 #include "span.h"
+#define NOB_IMPLEMENTATION
+#include "../nob.h"
 
 int main(void)
 {
@@ -26,8 +27,9 @@ int main(void)
             printf("Restarted animation\n");
         }
         if (IsKeyPressed(KEY_C)) {
-            spc_clear_tasks();
+            spc_clear_for_recomp();
             spc_umka_init(filename);
+            spc_run_umka();
             printf("Recompiled %s\n", filename);
         }
 
@@ -44,48 +46,3 @@ int main(void)
 
     return 0;
 }
-
-// int main2(void)
-// {
-//     IVector2 res = { 800, 600 };
-//     SetConfigFlags(FLAG_MSAA_4X_HINT);
-//     SetTraceLogLevel(LOG_WARNING);
-//     InitWindow(res.x, res.y, "span - axes test");
-//     SetTargetFPS(60);
-
-//     Camera2D cam = {
-//         .offset = Vector2Scale(spv_itof(res), 0.5),
-//         .target = Vector2Zero(),
-//         .rotation = 0.0f,
-//         .zoom = 1.0f,
-//     };
-
-//     const Axes axes = spo_axes_init(Vector2Zero(), (Vector2){550.f, 550.f});
-//     PointList pts = {0};
-//     int n = 50;
-//     f64 dx = (axes.xmax - axes.xmin) / (f32)(n-1);
-//     int ind = 0;
-//     Vector2 p = {0};
-//     for (f64 x = axes.xmin; x <= axes.xmax; x += dx, ind++) {
-//         p = (Vector2){x, 10.f*cosf(2*PI*x)-15.f};
-//         p = spo_axes_plot(axes, p);
-//         arena_da_append(&arena, &pts, p);
-//     }
-//     // Padding final value for catmull-rom spline rendering
-//     arena_da_append(&arena, &pts, p);
-
-//     while (!WindowShouldClose()) {
-//         BeginDrawing();
-//         ClearBackground(BLACK);
-
-//         BeginMode2D(cam); {
-//             spo_axes_render(&axes, pts, 4.5f);
-//         } EndMode2D();
-
-//         DrawFPS(10, 10);
-//         EndDrawing();
-//     }
-
-//     CloseWindow();
-//     return 0;
-// }

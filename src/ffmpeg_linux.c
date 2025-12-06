@@ -66,7 +66,8 @@ FFMPEG *ffmpeg_start_rendering_video(const char *output_path, size_t width, size
             "-vb", "2500k",
             "-c:a", "aac",
             "-ab", "200k",
-            "-pix_fmt", "yuv420p",
+            // "-pix_fmt", "yuv420p",
+            "-pix_fmt", "rgba",
             output_path,
 
             NULL

@@ -98,10 +98,19 @@ typedef struct {
     Color color;
 } Text;
 
+typedef struct {
+    f64 xmin, xmax, ymin, ymax;
+    Rectangle box;
+    Vector2 origin_pos, coord_size, center_coord;
+} Axes;
+
 SP_STRUCT_ARR(PointList, Vector2);
 // NOTE: Personally, I prefer that "children" don't possess any knowledge of
 // their environment and who their "parent" is. But, for this one case, I
-// will try to ignore that and give curves knowledge of their "parent": axes
+// will try to ignore that and give curves knowledge of their "parent": axes.
+// The reason for this is because I want to allow curve to be treated as
+// distinct sub-objects that can be enabled and disabled, so the easiest thing
+// for me to do was to make a them a separate object (not sub-object).
 typedef struct {
     Id axes_id;
     PointList pts;
@@ -109,16 +118,19 @@ typedef struct {
 } Curve;
 
 typedef struct {
-    f64 xmin, xmax, ymin, ymax;
-    Rectangle box;
-    Vector2 origin_pos, coord_size, center_coord;
-} Axes;
+    const char *text;
+    f32 font_size;
+    DVector2 position;
+    Color color;
+    Texture texture;
+} Typst;
 
 typedef enum {
     OK_RECT,
     OK_TEXT,
     OK_AXES,
     OK_CURVE,
+    OK_TYPST,
 } ObjKind;
 
 typedef struct {
@@ -130,6 +142,7 @@ typedef struct {
         Text text;
         Axes axes;
         Curve curve;
+        Typst typst;
     } as;
 } Obj;
 SP_STRUCT_ARR(ObjList, Obj);
@@ -184,6 +197,7 @@ extern Context ctx;
 bool spc_init(const char *filename, RenderMode mode);
 bool spc_umka_init(const char *filename);
 void spc_renderer_init(RenderMode mode);
+void spc_run_umka(void);
 void spc_deinit(void);
 void spc_update(f32 dt);
 void spc_render(void);
@@ -192,9 +206,10 @@ void spc_print_tasks(TaskList tl);
 void spc_new_task(f64 duration);
 void spc_add_action(Action action);
 bool spc_get_obj(Id id, Obj **obj);
-void spc_clear_tasks(void);
+void spc_clear_for_recomp(void);
 void spc_reset(void);
-Obj spo_rect(DVector2 pos, DVector2 size, Color color);
+// Obj spo_rect(DVector2 pos, DVector2 size, Color color);
+bool spo_typst_compile(Typst *typ);
 void spo_get_pos(Obj *obj, DVector2 **pos);
 void spo_get_color(Obj *obj, Color **color);
 void spo_render(Obj obj);
@@ -207,6 +222,7 @@ void spuo_rect(UmkaStackSlot *p, UmkaStackSlot *r);
 void spuo_text(UmkaStackSlot *p, UmkaStackSlot *r);
 void spuo_axes(UmkaStackSlot *p, UmkaStackSlot *r);
 void spuo_curve(UmkaStackSlot *p, UmkaStackSlot *r);
+void spuo_typst(UmkaStackSlot *p, UmkaStackSlot *r);
 void spuo_enable(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_fade_in(UmkaStackSlot *p, UmkaStackSlot *r);
 void spu_fade_out(UmkaStackSlot *p, UmkaStackSlot *r);
